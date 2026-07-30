@@ -32,13 +32,11 @@
       </div>
       <label class="sr-only" for="providerSelect">Nhà cung cấp AI</label>
       <select id="providerSelect" class="provider-select" aria-label="Nhà cung cấp AI">
-        <option value="openrouter" selected>OpenRouter</option>
-        <option value="gemini">Gemini</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="gemini" selected>Gemini</option>
       </select>
       <label class="sr-only" for="modelInput">Model AI</label>
-      <input type="text" id="modelInput" class="model-input" autocomplete="off" value="openrouter/free" aria-label="Model AI">
-      <label class="sr-only" for="apiKeyInput">API Key</label>
-      <input type="password" id="apiKeyInput" class="api-key-input" autocomplete="off" placeholder="OpenRouter API Key">
+      <input type="text" id="modelInput" class="model-input" autocomplete="off" value="gemini-3.1-flash-lite" aria-label="Model AI">
     </div>
   </header>
 
@@ -51,6 +49,7 @@
         <button class="slide-nav-btn" id="prevSlideBtn">◄ Trang Trước</button>
         <span style="font-size:13px; font-weight:600; color:#94a3b8;">Màn hình bài giảng VLearn Slide</span>
         <button class="slide-nav-btn" id="toggleRegionDrawBtn" title="Chỉ khả dụng khi xem PDF thật đã tải lên">✏️ Vẽ khung để hỏi</button>
+        <button class="slide-nav-btn" id="pageQuizBtn" title="Tạo 1 câu hỏi kiểm tra hiểu riêng cho đúng trang đang xem">🎯 Quiz trang này</button>
         <button class="slide-nav-btn" id="nextSlideBtn">Trang Sau ►</button>
       </div>
 
@@ -124,7 +123,10 @@
           <button class="action-pill" id="pillQA">❓ Khi nào chọn Augment?</button>
         </div>
 
+        <div class="chat-image-preview" id="chatImagePreview" hidden></div>
         <div class="chat-input-area">
+          <button type="button" class="chat-attach-btn" id="chatImageBtn" title="Đính kèm ảnh để hỏi AI (có thể chọn nhiều ảnh)">📎</button>
+          <input type="file" id="chatImageInput" accept="image/*" multiple hidden>
           <input type="text" id="chatInput" placeholder="Hỏi về slide hoặc một khái niệm nền như VLM, RAG...">
           <button id="sendChatBtn">Gửi</button>
         </div>

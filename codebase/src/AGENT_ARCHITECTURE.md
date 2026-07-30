@@ -1,6 +1,6 @@
-# Kiến trúc Agent — VLearn Practice Coach (`src/`)
+# Kiến trúc Agent — VLearn Practice Coach (`codebase/src/`)
 
-Tài liệu này liệt kê toàn bộ function trong `src/` và đánh dấu cái nào là
+Tài liệu này liệt kê toàn bộ function trong `codebase/src/` và đánh dấu cái nào là
 **quyết định AI thật** (agent) so với **if-else/rule-based**, kèm workflow.
 
 ## Chú thích ký hiệu
@@ -37,7 +37,11 @@ Tài liệu này liệt kê toàn bộ function trong `src/` và đánh dấu c�
 | `setAgentMode` | 682 | 🖼️ | Badge "Gemini live / offline / lỗi" |
 | `activeProviderId` / `activeProvider` / `updateProviderReadiness` / `syncProviderControls` | 687–704 | ⚙️/🖼️ | Quản lý provider đang chọn |
 | `delay` | 713 | ⚙️ | Chờ giữa các lần retry |
-| **`callLLMAPI`** | 717 | 🔌 | **Cổng duy nhất gọi AI thật** — mọi quyết định 🤖 đều đi qua đây |
+| **`callLLMAPI`** | 717 | 🔌 | **Cổng duy nhất gọi AI thật** — gọi `/api/llm/generate` trên backend cục bộ (mục 5), không còn gọi thẳng Gemini/OpenRouter từ trình duyệt |
+| `callGeminiAgentTurn` | — | 🔌 | Gọi `/api/llm/agent-turn` trên backend — 1 vòng của agent function-calling |
+| `checkBackendHealth` / `updateProviderReadiness` / `syncProviderControls` | — | 🖼️ | Badge trạng thái dựa trên backend có sống hay không (`/api/health`), không còn dựa trên "có apiKey hay chưa" |
+| `searchSlidesViaBackend` | — | 🔌 | Gọi `/api/embed/search` trên backend — nhận lại top-k trang đã xếp hạng theo vector, không tự tính vector trong trình duyệt nữa |
+| `logInteraction` / `logQuizResult` / `getSessionId` | — | 🔌 | Fire-and-forget ghi log lên `/api/logs/*` (backend), phục vụ `eval/`/`validation/` — không phải quyết định AI |
 | `parseJSONObject` | 779 | ⚙️ | Parse JSON từ text AI trả về |
 | `formatLessonContext` | 794 | ⚙️ | Ghép context gửi AI (không phải quyết định) |
 | **`handleExplainRegion`** | 807 | 🤖 | Giải thích đoạn bôi đen |
@@ -64,13 +68,23 @@ Tài liệu này liệt kê toàn bộ function trong `src/` và đánh dấu c�
 ## 2. `grounding.mjs` — lớp an toàn/rule-based (0% AI)
 
 Toàn bộ **~40 function** trong file này đều là ⚙️ rule-based — không có dòng nào gọi
-`callLLMAPI`. Vai trò: retrieval (`retrieveRelevantSlides`, `buildRelevantContext`,
-`scoreText`, `tokenize`...), verify câu trả lời AI có căn cứ hay không
+`callLLMAPI`. Vai trò: retrieval từ-khoá (`retrieveRelevantSlides`, `buildRelevantContext`,
+`formatRetrievedContext`, `scoreText`, `tokenize`...), verify câu trả lời AI có căn cứ hay không
 (`validateGroundedResponse`, `validateHybridResponse`, `verifyCitationAndSnippet`,
 `validateSingleQuestion`, `validateQuizData`), guardrail
 (`detectGuardrailViolation` — regex, không phải AI router), và fallback khi
 offline/AI trả lời không đạt (`createOfflineAnswer`, `createOfflineExplanation`,
 `createOfflineSummary`, `createOfflineQuiz`, `evaluateEssayLocally`).
+
+`formatRetrievedContext` được tách riêng khỏi `buildRelevantContext` để cả retrieval
+từ-khoá (trong file này) lẫn kết quả vector search trả về từ backend (mục 5) đều
+dùng chung đúng 1 cách format context, không chép lại logic.
+
+**Lịch sử:** bản trước có `src/vectorstore.mjs` (kho vector tính trong trình duyệt,
+cache bằng `localStorage`). File đó đã bị xoá — toàn bộ logic vector (tính embedding,
+cache, xếp hạng cosine similarity) chuyển hẳn sang backend (`server/vectorstore.py`,
+xem mục 5) khi team quyết định thêm BE thật. `app.js` giờ chỉ gọi 1 API
+(`searchSlidesViaBackend`, mục 1) và nhận lại top-k trang đã xếp hạng sẵn.
 
 ## 3. `prompts.js` — nội dung giao cho AI (không tự gọi AI)
 
@@ -84,13 +98,48 @@ offline/AI trả lời không đạt (`createOfflineAnswer`, `createOfflineExpla
 | `buildMisconceptionHintPrompt` | `showMisconceptionHint` |
 | `buildVisionRegionPrompt` | `handleVisionRegionQuestion` |
 | `buildEssayEvaluatorPrompt` | `handleEvaluateEssay` |
+| `buildReActAgentSystemPrompt` / `REACT_AGENT_TOOLS` | `runReActChat` — system instruction + khai báo 6 tool cho agent function-calling (chỉ Gemini) |
 | `SYSTEM_ROUTER_PROMPT` | ⚠️ **Không được dùng ở đâu cả** — dead code, xem ghi chú cuối file |
 
-## 4. `providers.mjs` — transport (không phải quyết định)
+### 6 tool hiện có của agent (`REACT_AGENT_TOOLS`)
 
-`getProviderConfig`, `buildProviderRequest`, `parseProviderResponse`,
-`isRetryableProviderStatus` — build/parse HTTP request cho Gemini hoặc
-OpenRouter; không tự quyết định nội dung.
+| Tool | Executor trong `app.js` | Việc |
+|---|---|---|
+| `search_lesson_content` | `executeSearchLessonContent` | Tìm đoạn liên quan theo từ khoá — vector search thật (mục 5), rơi về từ khoá nếu lỗi |
+| `get_page_content` | `executeGetPageContent` | Lấy nguyên nội dung 1 trang theo số, để đọc trong chat |
+| `summarize_lesson` | `executeSummarizeLesson` | Tóm tắt cả bài |
+| `start_adaptive_quiz` | `executeStartAdaptiveQuiz` | Hành động: chuyển tab Quiz + bắt đầu phiên tự kiểm tra thích ứng (hỏi từng câu) |
+| `generate_quiz_batch` | `executeGenerateQuizBatch` | Hành động: chuyển tab Quiz + tạo ngay bộ quiz đầy đủ 8-10 câu (khác `start_adaptive_quiz` ở chỗ ra cả bộ cùng lúc, không hỏi tuần tự) |
+| `navigate_to_page` | `executeNavigateToPage` | Hành động: đổi màn hình slide đang hiển thị sang đúng 1 trang — khác `get_page_content` (chỉ trả nội dung để đọc, không đổi màn hình) |
+
+## 4. `providers.mjs` — transport phía client (không phải quyết định, không còn giữ key)
+
+`getProviderConfig`, `buildProviderRequest`, `buildGeminiAgentRequest`,
+`parseProviderResponse`, `parseGeminiAgentResponse`, `isRetryableProviderStatus`.
+
+**Đổi so với bản trước:** `buildProviderRequest`/`buildGeminiAgentRequest` không còn
+build URL gọi thẳng Gemini/OpenRouter kèm `apiKey` — giờ build request tới backend
+cục bộ (`/api/llm/generate`, `/api/llm/agent-turn`, xem mục 5). Backend trả nguyên
+payload gốc của provider nên `parseProviderResponse`/`parseGeminiAgentResponse` ở
+client không cần đổi gì. `buildGeminiEmbedRequest`/`parseGeminiEmbedResponse` (bản
+trước) đã bị xoá khỏi client — embedding giờ hoàn toàn phía backend.
+
+## 5. `codebase/server/` — backend Python (FastAPI), giữ API key + vector DB + log
+
+⚙️/🔌 — không có quyết định AI mới ở đây; đây là nơi **giấu key** và **transport**
+thay cho việc trước đây chạy thẳng trong trình duyệt. Chạy local lúc demo
+(`codebase/server/README.md`), phục vụ `codebase/src/` làm static site tại `/`.
+
+| File | Vai trò |
+|---|---|
+| `config.py` | Đọc `.env` gốc repo (`GEMINI_API_KEY`, `OPENROUTER_API_KEY`...) |
+| `db.py` | SQLite: bảng `slide_vectors` (cache vector dùng chung), `interaction_log`, `quiz_results` |
+| `providers.py` | 🔌 Port của `providers.mjs` phía server — build & **gọi thật** Gemini/OpenRouter (key chỉ ở đây), 1 lần/lượt, không tự retry (client giữ vòng lặp retry) |
+| `vectorstore.py` | ⚙️ Port của `vectorstore.mjs` cũ — `cosine_similarity`, `rank_slides_by_vector`, `fingerprint_slides` (cache key theo nội dung slide) |
+| `routers/llm.py` | `/api/llm/generate`, `/api/llm/agent-turn` — proxy 1-lượt và agent function-calling |
+| `routers/embed.py` | `/api/embed/search` — cache-or-embed rồi rank; luôn trả 200, `used_vector=false` khi lỗi để client tự rơi về từ-khoá |
+| `routers/logs.py` | `/api/logs/interaction`, `/api/logs/quiz-result`, `/api/logs/export` — phục vụ `eval/`/`validation/` |
+| `main.py` | Mount router + serve `codebase/src/` static, `/api/health` |
 
 ---
 
@@ -119,8 +168,9 @@ flowchart TD
     E --> EssayH["🤖 handleEvaluateEssay"]
 
     ExplainH & SumH & ChatH & BatchH & VisionH & EssayH --> LLM["callLLMAPI 🔌"]
-    LLM --> Providers["providers.mjs 🔌 Gemini / OpenRouter"]
-    Providers --> Valid{"⚙️ grounding.mjs: có căn cứ + đúng schema?"}
+    LLM --> Providers["providers.mjs 🔌 → /api/llm/*"]
+    Providers --> Backend["server/ 🔌 giữ key, gọi thật Gemini / OpenRouter"]
+    Backend --> Valid{"⚙️ grounding.mjs: có căn cứ + đúng schema?"}
     Valid -->|đạt| ShowAI["Hiển thị câu trả lời AI"]
     Valid -->|không đạt / lỗi / offline| Fallback["⚙️ createOffline* (rule-based)"]
 ```

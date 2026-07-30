@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { VLEARN_LESSONS } from '../src/data.js';
+import { VLEARN_LESSONS } from '../codebase/src/data.js';
 import {
   createGeneralKnowledgeAnswer,
   createHybridOfflineAnswer,
@@ -16,13 +16,13 @@ import {
   validateHybridResponse,
   validateQuizData,
   verifyCitationAndSnippet
-} from '../src/grounding.mjs';
+} from '../codebase/src/grounding.mjs';
 import {
   buildProviderRequest,
   getProviderConfig,
   isRetryableProviderStatus,
   parseProviderResponse
-} from '../src/providers.mjs';
+} from '../codebase/src/providers.mjs';
 
 const dayTwo = VLEARN_LESSONS[0];
 const dayThree = VLEARN_LESSONS[1];
@@ -33,17 +33,22 @@ assert.equal(
   'Provider không hợp lệ phải fallback về OpenRouter'
 );
 
+// Từ khi có backend (codebase/server/), buildProviderRequest không còn gọi thẳng Gemini/
+// OpenRouter kèm apiKey nữa — nó luôn build request tới backend cục bộ
+// (/api/llm/generate), backend mới là nơi cầm key thật và chọn provider theo
+// providerId gửi trong body. Test cập nhật lại đúng hợp đồng mới này.
 const geminiRequest = buildProviderRequest({
   providerId: 'gemini',
-  apiKey: 'gemini-test-key',
   model: 'gemini-2.5-flash',
   promptText: 'VLM là gì?',
   json: true
 });
 const geminiBody = JSON.parse(geminiRequest.options.body);
-assert.match(geminiRequest.url, /gemini-2\.5-flash:generateContent$/);
-assert.equal(geminiRequest.options.headers['x-goog-api-key'], 'gemini-test-key');
-assert.equal(geminiBody.generationConfig.temperature, 0.1);
+assert.equal(geminiRequest.url, '/api/llm/generate', 'Client phải gọi backend cục bộ, không gọi thẳng Gemini');
+assert.equal(geminiRequest.options.headers['Content-Type'], 'application/json');
+assert.equal(geminiBody.providerId, 'gemini');
+assert.equal(geminiBody.model, 'gemini-2.5-flash');
+assert.equal(geminiBody.json, true);
 assert.equal(
   parseProviderResponse('gemini', {
     candidates: [{ content: { parts: [{ text: 'Gemini response' }] } }]
@@ -53,18 +58,17 @@ assert.equal(
 
 const openRouterRequest = buildProviderRequest({
   providerId: 'openrouter',
-  apiKey: 'openrouter-test-key',
   model: 'openrouter/free',
   promptText: 'VLM là gì?',
-  temperature: 0.55,
-  origin: 'http://localhost:3000'
+  temperature: 0.55
 });
 const openRouterBody = JSON.parse(openRouterRequest.options.body);
-assert.equal(openRouterRequest.url, 'https://openrouter.ai/api/v1/chat/completions');
 assert.equal(
-  openRouterRequest.options.headers.Authorization,
-  'Bearer openrouter-test-key'
+  openRouterRequest.url,
+  '/api/llm/generate',
+  'OpenRouter cũng đi qua cùng 1 endpoint backend cục bộ, không gọi thẳng openrouter.ai từ client nữa'
 );
+assert.equal(openRouterBody.providerId, 'openrouter');
 assert.equal(openRouterBody.model, 'openrouter/free');
 assert.equal(openRouterBody.temperature, 0.55);
 assert.equal(
@@ -77,15 +81,15 @@ assert.equal(isRetryableProviderStatus(429), true);
 assert.equal(isRetryableProviderStatus(403), false);
 
 assert.equal(
-  retrieveRelevantSlides(dayTwo, 'Khi nào nên dùng Augment Automation?')[0].slide.page,
-  15,
-  'Augment phải truy xuất đúng trang 15'
+  retrieveRelevantSlides(dayTwo, 'AlphaGo đã thắng Lee Sedol bằng nước đi nào?')[0].slide.page,
+  22,
+  'AlphaGo phải truy xuất đúng trang 22'
 );
 
 assert.equal(
-  retrieveRelevantSlides(dayThree, 'ReAct hoạt động theo chu kỳ nào?')[0].slide.page,
-  12,
-  'ReAct phải truy xuất đúng trang 12'
+  retrieveRelevantSlides(dayThree, 'Kỹ thuật Five Whys dùng để làm gì?')[0].slide.page,
+  4,
+  'Five Whys phải truy xuất đúng trang 4'
 );
 
 assert.equal(
@@ -94,7 +98,7 @@ assert.equal(
   'Câu ngoài tài liệu phải bị từ chối thay vì mặc định về một slide'
 );
 
-const expandedAnswer = createOfflineAnswer(dayTwo, 'Khi nào nên dùng Augment?');
+const expandedAnswer = createOfflineAnswer(dayTwo, 'Vì sao Transformer thay thế được RNN?');
 assert.match(
   expandedAnswer.content,
   /\*\*Trả lời ngắn\*\*[\s\S]+\*\*Giải thích thêm\*\*[\s\S]+\*\*Ví dụ minh họa \(do hệ thống tạo\)\*\*/,
@@ -259,9 +263,9 @@ assert.equal(
 
 assert.equal(
   validateGroundedResponse(
-    'Augment phù hợp khi sai sót đắt và con người quyết định. [Trang 15]',
+    'AlphaGo đi nước số 37, một nước chưa từng tồn tại trong lịch sử cờ vây. [Trang 22]',
     dayTwo,
-    { allowedPages: [15] }
+    { allowedPages: [22] }
   ).isValid,
   true,
   'Phản hồi có nội dung và trích dẫn đúng phải được giữ'
@@ -269,7 +273,7 @@ assert.equal(
 
 assert.equal(
   validateGroundedResponse(
-    'Augment phù hợp khi sai sót đắt. [Trang 99]',
+    'AlphaGo đi nước số 37. [Trang 99]',
     dayTwo
   ).isValid,
   false,
@@ -279,8 +283,8 @@ assert.equal(
 assert.equal(
   verifyCitationAndSnippet(
     dayTwo,
-    15,
-    'Augment: AI gợi ý, người quyết định. Sai thì đắt'
+    22,
+    'AlphaGo học từ 150.000 ván cờ vây của chuyên gia để có trực giác ban đầu'
   ).isValid,
   true,
   'Source snippet thật phải khớp'
@@ -289,7 +293,7 @@ assert.equal(
 assert.equal(
   verifyCitationAndSnippet(
     dayTwo,
-    15,
+    22,
     'Mô hình này dự báo thời tiết bằng vệ tinh'
   ).isValid,
   false,
@@ -298,17 +302,17 @@ assert.equal(
 
 const dayThreeSummary = createOfflineSummary(dayThree);
 assert.equal(dayThreeSummary.hasContent, true);
-assert.match(dayThreeSummary.content, /ReAct|Tool|Routing/);
-assert.doesNotMatch(dayThreeSummary.content, /deadline/i);
+assert.match(dayThreeSummary.content, /Five Whys|Double Diamond|Dogfooding/);
+assert.doesNotMatch(dayThreeSummary.content, /AlphaGo|Transformer/i);
 
 const dayThreeQuiz = createOfflineQuiz(dayThree);
 const verifiedDayThreeQuiz = validateQuizData(dayThreeQuiz, dayThree);
 assert.ok(verifiedDayThreeQuiz.mcq_questions.length >= 1);
 assert.ok(
-  verifiedDayThreeQuiz.mcq_questions.every(question => /Trang (3|12|15)/.test(question.citation)),
+  verifiedDayThreeQuiz.mcq_questions.every(question => /Trang (4|12|19)/.test(question.citation)),
   'Quiz Day 3 chỉ được trích các trang tồn tại của Day 3'
 );
-assert.doesNotMatch(JSON.stringify(verifiedDayThreeQuiz), /deadline/i);
+assert.doesNotMatch(JSON.stringify(verifiedDayThreeQuiz), /AlphaGo|Transformer/i);
 
 const dayTwoQuiz = validateQuizData(createOfflineQuiz(dayTwo), dayTwo);
 assert.equal(dayTwoQuiz.mcq_questions.length, 6, 'Day 2 phải có 6 câu tình huống đã kiểm chứng');

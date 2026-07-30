@@ -7,12 +7,16 @@ import {
   buildAdaptiveQuestionPrompt,
   buildMisconceptionHintPrompt,
   buildVisionRegionPrompt,
+  buildImageChatPrompt,
   buildReActAgentSystemPrompt,
   REACT_AGENT_TOOLS,
   buildEssayEvaluatorPrompt
 } from './prompts.js';
 import {
   buildRelevantContext,
+  formatRetrievedContext,
+  retrieveRelevantSlides,
+  retrieveRelevantTranscript,
   createOfflineExplanation,
   createHybridOfflineAnswer,
   createOfflineQuiz,
@@ -23,7 +27,8 @@ import {
   validateGroundedResponse,
   validateHybridResponse,
   validateQuizData,
-  validateSingleQuestion
+  validateSingleQuestion,
+  extractCitations
 } from './grounding.mjs';
 import {
   AI_PROVIDERS,
@@ -53,22 +58,73 @@ let chatHistory = [];
 let lastDiscussedPage = null;
 const MAX_CHAT_HISTORY_TURNS = 8;
 const MAX_AGENT_TOOL_CALLS = 4;
+// Ảnh học viên đã gửi trong chat, để quiz theo trang (B) có thể hiện lại đúng ảnh khi hỏi
+// lại đúng trang đó — cap 5 để không phình bộ nhớ phiên làm việc.
+let recentImageAttachments = [];
+const MAX_RECENT_IMAGE_ATTACHMENTS = 5;
+// Ảnh đã chọn/kéo-thả vào ô chat nhưng CHƯA gửi — xoá sau mỗi lần bấm Gửi.
+let pendingChatImages = [];
 let pdfRenderTask = null;
 let pdfRenderSequence = 0;
 let resizeTimer = null;
-const providerCredentials = {
-  openrouter: '',
-  gemini: ''
-};
+let backendHealthy = null;
 const providerModels = {
   openrouter: AI_PROVIDERS.openrouter.defaultModel,
   gemini: AI_PROVIDERS.gemini.defaultModel
 };
 
+// ID phiên ngẫu nhiên, sống trong localStorage của trình duyệt này - dùng để nhóm các
+// dòng log gửi lên backend (/api/logs/*) theo từng người test, không phải tài khoản
+// thật (app không có auth). Đủ để Đăng Đức/Sơn tách được log của từng lượt test.
+function getSessionId() {
+  const KEY = 'vlearn:sessionId';
+  let id = window.localStorage.getItem(KEY);
+  if (!id) {
+    id = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    window.localStorage.setItem(KEY, id);
+  }
+  return id;
+}
+
+// Fire-and-forget - phục vụ eval/ (case thật) và validation/ (feedback log người test
+// thật), không được phép chặn hoặc làm hỏng trải nghiệm học nếu backend/mạng lỗi.
+function logInteraction(lesson, type, query, pages) {
+  fetch('/api/logs/interaction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: getSessionId(),
+      lesson_id: lesson?.id ?? null,
+      type,
+      query: String(query ?? '').slice(0, 500),
+      response_pages: (pages ?? []).filter(page => page != null).map(Number)
+    })
+  }).catch(error => console.warn('Log interaction thất bại (không ảnh hưởng trải nghiệm):', error));
+}
+
+function logQuizResult(lesson, page, question, isCorrect, tier) {
+  fetch('/api/logs/quiz-result', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      session_id: getSessionId(),
+      lesson_id: lesson?.id ?? null,
+      page: page != null ? Number(page) : null,
+      question: String(question ?? '').slice(0, 500),
+      is_correct: Boolean(isCorrect),
+      tier: tier ?? null
+    })
+  }).catch(error => console.warn('Log quiz result thất bại (không ảnh hưởng trải nghiệm):', error));
+}
+
+function citationPageNumber(citation) {
+  const match = String(citation ?? '').match(/\d{1,3}/);
+  return match ? Number(match[0]) : null;
+}
+
 const lessonSelect = document.getElementById('lessonSelect');
 const providerSelect = document.getElementById('providerSelect');
 const modelInput = document.getElementById('modelInput');
-const apiKeyInput = document.getElementById('apiKeyInput');
 const agentModeBadge = document.getElementById('agentModeBadge');
 const agentModeText = document.getElementById('agentModeText');
 const slideCanvas = document.getElementById('slideCanvas');
@@ -86,11 +142,15 @@ const prevSlideBtn = document.getElementById('prevSlideBtn');
 const nextSlideBtn = document.getElementById('nextSlideBtn');
 const highlightTooltip = document.getElementById('highlightTooltip');
 const toggleRegionDrawBtn = document.getElementById('toggleRegionDrawBtn');
+const pageQuizBtn = document.getElementById('pageQuizBtn');
 const pdfCanvasWrap = document.getElementById('pdfCanvasWrap');
 const regionSelectBox = document.getElementById('regionSelectBox');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const sendChatBtn = document.getElementById('sendChatBtn');
+const chatImageBtn = document.getElementById('chatImageBtn');
+const chatImageInput = document.getElementById('chatImageInput');
+const chatImagePreview = document.getElementById('chatImagePreview');
 const pillSummarize = document.getElementById('pillSummarize');
 const pillQA = document.getElementById('pillQA');
 const tabChatBtn = document.getElementById('tabChatBtn');
@@ -118,6 +178,7 @@ function initApp() {
   setupUploadHandlers();
   syncProviderControls();
   renderCurrentSlide();
+  checkBackendHealth();
 }
 
 function populateLessonSelector() {
@@ -351,6 +412,25 @@ function setupEventListeners() {
     if (event.key === 'Enter' && !event.isComposing) handleUserChat();
   });
 
+  // Đính kèm ảnh vào chat: vừa bấm nút chọn file, vừa kéo-thả thẳng vào khung tin nhắn.
+  chatImageBtn.addEventListener('click', () => chatImageInput.click());
+  chatImageInput.addEventListener('change', () => {
+    addChatImageFiles(chatImageInput.files);
+    chatImageInput.value = '';
+  });
+  chatMessages.addEventListener('dragover', event => {
+    event.preventDefault();
+    chatMessages.classList.add('drag-over');
+  });
+  chatMessages.addEventListener('dragleave', event => {
+    if (event.target === chatMessages) chatMessages.classList.remove('drag-over');
+  });
+  chatMessages.addEventListener('drop', event => {
+    event.preventDefault();
+    chatMessages.classList.remove('drag-over');
+    addChatImageFiles(event.dataTransfer?.files);
+  });
+
   pillSummarize.addEventListener('click', handleSummarizeDeck);
   pillQA.addEventListener('click', () => {
     chatInput.value = pillQA.dataset.query;
@@ -358,16 +438,12 @@ function setupEventListeners() {
   });
   btnGenerateQuiz.addEventListener('click', handleGenerateQuiz);
   btnStartAdaptive.addEventListener('click', startAdaptiveSession);
+  pageQuizBtn.addEventListener('click', handleGeneratePageQuiz);
 
   providerSelect.addEventListener('change', syncProviderControls);
   modelInput.addEventListener('input', () => {
     providerModels[activeProviderId()] =
       modelInput.value.trim() || activeProvider().defaultModel;
-    updateProviderReadiness();
-  });
-  apiKeyInput.addEventListener('input', () => {
-    providerCredentials[activeProviderId()] = apiKeyInput.value.trim();
-    updateProviderReadiness();
   });
 
   document.addEventListener('click', event => {
@@ -717,12 +793,17 @@ function activeProvider() {
   return getProviderConfig(activeProviderId());
 }
 
+// Readiness giờ phản ánh backend cục bộ (server/) có sống hay không, không còn "có
+// apiKey hay chưa" — key không còn nằm ở client, xem checkBackendHealth().
 function updateProviderReadiness() {
   const provider = activeProvider();
-  const hasKey = Boolean(providerCredentials[provider.id]);
+  if (backendHealthy === null) {
+    setAgentMode('offline', `${provider.label} · đang kết nối backend…`);
+    return;
+  }
   setAgentMode(
-    hasKey ? 'ready' : 'offline',
-    hasKey ? `${provider.label} sẵn sàng` : `${provider.label} · offline`
+    backendHealthy ? 'ready' : 'offline',
+    backendHealthy ? `${provider.label} sẵn sàng (qua backend)` : 'Backend chưa chạy — xem server/README.md'
   );
 }
 
@@ -730,8 +811,17 @@ function syncProviderControls() {
   const provider = activeProvider();
   modelInput.value = providerModels[provider.id] || provider.defaultModel;
   modelInput.placeholder = provider.defaultModel;
-  apiKeyInput.value = providerCredentials[provider.id] || '';
-  apiKeyInput.placeholder = provider.keyPlaceholder;
+  updateProviderReadiness();
+}
+
+async function checkBackendHealth() {
+  try {
+    const response = await fetch('/api/health');
+    const data = await response.json().catch(() => null);
+    backendHealthy = Boolean(response.ok && data?.ok);
+  } catch {
+    backendHealthy = false;
+  }
   updateProviderReadiness();
 }
 
@@ -739,26 +829,19 @@ function delay(milliseconds) {
   return new Promise(resolve => window.setTimeout(resolve, milliseconds));
 }
 
-async function callLLMAPI(promptText, { json = false, temperature, imageBase64, imageMimeType } = {}) {
+async function callLLMAPI(promptText, { json = false, temperature, imageBase64, imageMimeType, images } = {}) {
   const provider = activeProvider();
-  const apiKey = providerCredentials[provider.id];
-  if (!apiKey) {
-    setAgentMode('offline', `${provider.label} · offline`);
-    return null;
-  }
-
   const model = modelInput.value.trim() || provider.defaultModel;
   providerModels[provider.id] = model;
   const request = buildProviderRequest({
     providerId: provider.id,
-    apiKey,
     model,
     promptText,
     json,
     temperature,
-    origin: window.location.origin,
     imageBase64,
-    imageMimeType
+    imageMimeType,
+    images
   });
 
   for (let attempt = 0; attempt < API_RETRY_DELAYS_MS.length; attempt += 1) {
@@ -781,6 +864,7 @@ async function callLLMAPI(promptText, { json = false, temperature, imageBase64, 
       const data = await response.json();
       const text = parseProviderResponse(provider.id, data);
       if (!text) throw new Error(`${provider.label} không trả về nội dung`);
+      backendHealthy = true;
       setAgentMode('live', `${provider.label} live · ${model}`);
       return text;
     } catch (error) {
@@ -807,17 +891,16 @@ async function callLLMAPI(promptText, { json = false, temperature, imageBase64, 
 // không phải Gemini, handleUserChat tự rơi về luồng cũ (1 lần search + 1 lần gọi AI).
 
 async function callGeminiAgentTurn(contents, tools, systemInstruction) {
-  const apiKey = providerCredentials.gemini;
-  if (!apiKey) return null;
   const model = modelInput.value.trim() || activeProvider().defaultModel;
 
-  const request = buildGeminiAgentRequest({ apiKey, model, systemInstruction, contents, tools, temperature: 0.3 });
+  const request = buildGeminiAgentRequest({ model, systemInstruction, contents, tools, temperature: 0.3 });
 
   for (let attempt = 0; attempt < API_RETRY_DELAYS_MS.length; attempt += 1) {
     if (API_RETRY_DELAYS_MS[attempt]) await delay(API_RETRY_DELAYS_MS[attempt]);
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
     try {
+      console.log('[agent-turn] gửi request tới', request.url, contents);
       const response = await fetch(request.url, { ...request.options, signal: controller.signal });
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
@@ -827,6 +910,7 @@ async function callGeminiAgentTurn(contents, tools, systemInstruction) {
         throw providerError;
       }
       const data = await response.json();
+      console.log('[agent-turn] payload trả về:', data);
       setAgentMode('live', `Gemini live · ${model} (agent)`);
       return parseGeminiAgentResponse(data);
     } catch (error) {
@@ -844,12 +928,51 @@ async function callGeminiAgentTurn(contents, tools, systemInstruction) {
   return null;
 }
 
-function executeSearchLessonContent(lesson, args) {
+// --- RAG bằng vector embedding thật cho search_lesson_content ---------------------
+// Vector giờ tính & cache hẳn ở backend (server/vectorstore.py + SQLite), không còn
+// chạy trong trình duyệt - client chỉ gửi nội dung slide + câu hỏi, nhận lại top-k
+// trang đã xếp hạng theo cosine similarity. Không còn phụ thuộc providerId==='gemini'
+// phía client: server có GEMINI_API_KEY riêng cho việc embedding, độc lập với provider
+// đang chọn để chat. Backend luôn trả 200; used_vector=false khi không tính được vector
+// (thiếu key/mạng/quota) để nơi gọi tự rơi về retrieval từ-khoá cũ - không có đường
+// nào làm search "câm" hoàn toàn.
+async function searchSlidesViaBackend(lesson, query, { limit = 3 } = {}) {
+  const slidesWithText = (lesson?.slides ?? [])
+    .filter(slide => slide.content?.trim())
+    .map(slide => ({ page: Number(slide.page), title: slide.title, content: slide.content }));
+  if (!slidesWithText.length) return null;
+
+  try {
+    const response = await fetch('/api/embed/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lesson_id: lesson.id, slides: slidesWithText, query, limit })
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data?.used_vector || !Array.isArray(data.matches) || !data.matches.length) return null;
+
+    const slideByPage = new Map(lesson.slides.map(slide => [Number(slide.page), slide]));
+    return data.matches
+      .map(match => ({ slide: slideByPage.get(Number(match.page)), score: match.score }))
+      .filter(item => item.slide);
+  } catch (error) {
+    console.warn('Vector search qua backend thất bại:', error);
+    return null;
+  }
+}
+
+async function executeSearchLessonContent(lesson, args) {
   const query = String(args?.query ?? '').trim();
   if (!query) {
     return { text: 'Thiếu từ khoá tìm kiếm.', pages: [], transcriptIds: [] };
   }
-  const context = buildRelevantContext(lesson, query);
+
+  const vectorSlideMatches = await searchSlidesViaBackend(lesson, query, { limit: 3 });
+  const transcriptMatches = retrieveRelevantTranscript(lesson, query);
+  const slideMatches = vectorSlideMatches ?? retrieveRelevantSlides(lesson, query);
+  const context = formatRetrievedContext(slideMatches, transcriptMatches);
+
   if (!context.text) {
     return {
       text: `Không tìm thấy đoạn nào liên quan tới "${query}" trong slide/transcript bài giảng này.`,
@@ -857,6 +980,13 @@ function executeSearchLessonContent(lesson, args) {
       transcriptIds: []
     };
   }
+
+  appendTrace(
+    vectorSlideMatches
+      ? `🧭 Tìm theo vector similarity (embedding) — khớp ${slideMatches.length} trang slide.`
+      : `🔤 Tìm theo từ khoá (fallback) — khớp ${slideMatches.length} trang slide.`
+  );
+
   return { text: context.text, pages: context.allowedPages, transcriptIds: context.allowedTranscriptIds };
 }
 
@@ -894,7 +1024,45 @@ function executeStartAdaptiveQuiz() {
   };
 }
 
+async function executeGenerateQuizBatch() {
+  switchTab('quiz');
+  await handleGenerateQuiz();
+  return {
+    text: 'Đã chuyển sang tab "Kiểm Tra Hiểu Thật" và tạo bộ quiz đầy đủ cho bài giảng này.',
+    pages: [],
+    transcriptIds: []
+  };
+}
+
+function executeNavigateToPage(lesson, args) {
+  const page = Number(args?.page);
+  const slide = getSlideByPage(lesson, page);
+  if (!slide) {
+    return { text: `Không tìm thấy Trang ${page} trong bài giảng này, không thể chuyển màn hình tới.`, pages: [], transcriptIds: [] };
+  }
+  navigateToPage(page);
+  return {
+    text: `Đã chuyển màn hình slide sang Trang ${page} — "${slide.title}".`,
+    pages: [Number(page)],
+    transcriptIds: []
+  };
+}
+
+// Toàn bộ hàm bọc trong try/catch riêng - lý do: nếu 1 bước bất kỳ (gọi API, chạy
+// tool) ném lỗi mà không bắt, exception sẽ bay thẳng lên handleUserChat và làm
+// chat "im lặng" hoàn toàn (không có cả tin nhắn dự phòng) vì phần code fallback
+// phía dưới không bao giờ chạy tới. Bắt lỗi ở đây, log đầy đủ ra console, trả về
+// null để handleUserChat tự rơi về luồng chat cũ như thiết kế ban đầu.
 async function runReActChat(lesson, query) {
+  try {
+    return await runReActChatUnsafe(lesson, query);
+  } catch (error) {
+    console.error('runReActChat thất bại, rơi về luồng chat cũ:', error);
+    return null;
+  }
+}
+
+async function runReActChatUnsafe(lesson, query) {
   const contents = [
     ...chatHistory
       .slice(0, -1)
@@ -907,7 +1075,9 @@ async function runReActChat(lesson, query) {
   const allowedTranscriptIds = [];
 
   for (let step = 0; step < MAX_AGENT_TOOL_CALLS; step += 1) {
+    console.log(`[agent] bước ${step + 1}/${MAX_AGENT_TOOL_CALLS} - gọi callGeminiAgentTurn...`);
     const turn = await callGeminiAgentTurn(contents, REACT_AGENT_TOOLS, systemInstruction);
+    console.log('[agent] kết quả turn:', turn);
     if (!turn) return null;
 
     if (turn.type === 'text') {
@@ -931,16 +1101,25 @@ async function runReActChat(lesson, query) {
 
     appendTrace(`🔧 Tool: ${turn.name}(${JSON.stringify(turn.args)})`);
     let toolResult;
-    if (turn.name === 'search_lesson_content') {
-      toolResult = await executeSearchLessonContent(lesson, turn.args);
-    } else if (turn.name === 'get_page_content') {
-      toolResult = await executeGetPageContent(lesson, turn.args);
-    } else if (turn.name === 'summarize_lesson') {
-      toolResult = await executeSummarizeLesson(lesson);
-    } else if (turn.name === 'start_adaptive_quiz') {
-      toolResult = await executeStartAdaptiveQuiz();
-    } else {
-      toolResult = { text: `Tool không tồn tại: ${turn.name}`, pages: [], transcriptIds: [] };
+    try {
+      if (turn.name === 'search_lesson_content') {
+        toolResult = await executeSearchLessonContent(lesson, turn.args);
+      } else if (turn.name === 'get_page_content') {
+        toolResult = await executeGetPageContent(lesson, turn.args);
+      } else if (turn.name === 'summarize_lesson') {
+        toolResult = await executeSummarizeLesson(lesson);
+      } else if (turn.name === 'start_adaptive_quiz') {
+        toolResult = await executeStartAdaptiveQuiz();
+      } else if (turn.name === 'generate_quiz_batch') {
+        toolResult = await executeGenerateQuizBatch();
+      } else if (turn.name === 'navigate_to_page') {
+        toolResult = executeNavigateToPage(lesson, turn.args);
+      } else {
+        toolResult = { text: `Tool không tồn tại: ${turn.name}`, pages: [], transcriptIds: [] };
+      }
+    } catch (toolError) {
+      console.error(`[agent] tool ${turn.name} ném lỗi:`, toolError);
+      toolResult = { text: `Tool ${turn.name} gặp lỗi: ${toolError?.message ?? toolError}`, pages: [], transcriptIds: [] };
     }
     allowedPages.push(...toolResult.pages);
     allowedTranscriptIds.push(...toolResult.transcriptIds);
@@ -1074,14 +1253,7 @@ async function handleVisionRegionQuestion(imageBase64, pageNum) {
   if (activeProviderId() !== 'gemini') {
     appendMessage(
       'bot',
-      '🖼️ Đọc vùng ảnh (vision) hiện chỉ hỗ trợ qua provider **Gemini**. Hãy chọn Gemini + nhập API key ở góc trên rồi vẽ khung lại.'
-    );
-    return;
-  }
-  if (!providerCredentials.gemini) {
-    appendMessage(
-      'bot',
-      '🖼️ Cần nhập **Gemini API Key** ở góc trên để đọc vùng ảnh đã khoanh — tính năng này không có chế độ offline (ảnh cần model có khả năng thị giác).'
+      '🖼️ Đọc vùng ảnh (vision) hiện chỉ hỗ trợ qua provider **Gemini**. Hãy chọn Gemini ở góc trên rồi vẽ khung lại.'
     );
     return;
   }
@@ -1092,13 +1264,133 @@ async function handleVisionRegionQuestion(imageBase64, pageNum) {
   thinkingMsg.remove();
 
   if (!llmResponse) {
-    appendMessage('bot', '❌ Không đọc được vùng ảnh này (lỗi mạng hoặc API). Hãy thử vẽ lại khung hoặc kiểm tra API key.');
+    appendMessage('bot', '❌ Không đọc được vùng ảnh này (backend lỗi hoặc mất mạng). Hãy thử vẽ lại khung hoặc kiểm tra server/README.md.');
     return;
   }
   appendMessage('bot', llmResponse, `Trang ${pageNum}`);
   pushChatHistory('assistant', llmResponse);
   interactionLog.push({ page: pageNum, type: 'region', text: llmResponse.slice(0, 160) });
+  logInteraction(currentLesson(), 'vision', llmResponse, [pageNum]);
   lastDiscussedPage = pageNum;
+}
+
+// --- Gửi ảnh trong chat (khác handleVisionRegionQuestion ở trên: ảnh đó CẮT TỪ đúng 1 trang
+// slide nên biết chắc pageNum; ảnh ở đây do học viên TỰ CHỌN/CHỤP gửi, có thể nhiều ảnh cùng
+// lúc để so sánh, và model phải TỰ xác định có liên quan bài giảng đang mở hay không) ---
+
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      resolve({ dataUrl, base64: dataUrl.split(',')[1] ?? '', mimeType: file.type || 'image/png' });
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Không đọc được file ảnh.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addChatImageFiles(fileList) {
+  const files = Array.from(fileList ?? []).filter(file => file.type.startsWith('image/'));
+  if (!files.length) return;
+  const images = await Promise.all(files.map(readImageFile));
+  pendingChatImages.push(...images);
+  renderChatImagePreview();
+}
+
+function clearPendingChatImages() {
+  pendingChatImages = [];
+  renderChatImagePreview();
+}
+
+function renderChatImagePreview() {
+  chatImagePreview.innerHTML = '';
+  chatImagePreview.hidden = pendingChatImages.length === 0;
+  pendingChatImages.forEach((image, index) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'chat-image-thumb';
+
+    const img = document.createElement('img');
+    img.src = image.dataUrl;
+    img.alt = `Ảnh đính kèm ${index + 1}`;
+    thumb.appendChild(img);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'chat-image-thumb-remove';
+    removeBtn.title = 'Bỏ ảnh này';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', () => {
+      pendingChatImages.splice(index, 1);
+      renderChatImagePreview();
+    });
+    thumb.appendChild(removeBtn);
+
+    chatImagePreview.appendChild(thumb);
+  });
+}
+
+function pushRecentImageAttachment(page, dataUrl) {
+  recentImageAttachments.push({ page, dataUrl });
+  if (recentImageAttachments.length > MAX_RECENT_IMAGE_ATTACHMENTS) recentImageAttachments.shift();
+}
+
+function appendUserImageMessage(images, query) {
+  const label = query
+    ? `🖼️ Đã gửi ${images.length} ảnh kèm câu hỏi: ${query}`
+    : `🖼️ Đã gửi ${images.length} ảnh để hỏi AI.`;
+  const msgDiv = appendMessage('user', label);
+  const strip = document.createElement('div');
+  strip.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;';
+  images.forEach((image, index) => {
+    const img = document.createElement('img');
+    img.src = image.dataUrl;
+    img.alt = `Ảnh đính kèm ${index + 1}`;
+    img.style.cssText = 'max-width:110px; max-height:110px; border-radius:8px; border:1px solid var(--panel-border, #334155); object-fit:cover; display:block;';
+    strip.appendChild(img);
+  });
+  msgDiv.appendChild(strip);
+  return msgDiv;
+}
+
+async function handleImageChatQuestion(images, query) {
+  if (activeProviderId() !== 'gemini') {
+    appendMessage(
+      'bot',
+      '🖼️ Gửi ảnh trong chat hiện chỉ hỗ trợ qua provider **Gemini**. Hãy chọn Gemini ở góc trên rồi gửi lại ảnh.'
+    );
+    return;
+  }
+
+  const lesson = currentLesson();
+  const thinkingMsg = appendMessage(
+    'bot',
+    images.length > 1 ? `👀 Đang xem ${images.length} ảnh bạn vừa gửi…` : '👀 Đang xem ảnh bạn vừa gửi…'
+  );
+  const slidesOutline = (lesson?.slides ?? [])
+    .map(slide => `Trang ${slide.page}: ${slide.title}`)
+    .join('\n');
+  const prompt = buildImageChatPrompt(lesson?.title ?? '', slidesOutline, query, images.length);
+  const llmResponse = await callLLMAPI(prompt, {
+    images: images.map(image => ({ data: image.base64, mimeType: image.mimeType }))
+  });
+  thinkingMsg.remove();
+
+  if (!llmResponse) {
+    appendMessage('bot', '❌ Không đọc được ảnh này (backend lỗi hoặc mất mạng). Hãy thử gửi lại.');
+    return;
+  }
+
+  const citedPages = extractCitations(llmResponse).pages;
+  const primaryPage = citedPages[0] ?? null;
+  appendMessage('bot', llmResponse, primaryPage != null ? `Trang ${primaryPage}` : null);
+  pushChatHistory('assistant', llmResponse);
+  interactionLog.push({ page: primaryPage, type: 'image', text: (query || llmResponse).slice(0, 160) });
+  logInteraction(lesson, 'image', query || '(ảnh không kèm chữ)', citedPages);
+  if (primaryPage != null) {
+    lastDiscussedPage = primaryPage;
+    pushRecentImageAttachment(primaryPage, images[0].dataUrl);
+  }
 }
 
 // Logic thuần (không đụng UI) để cả nút "Tóm tắt" lẫn tool summarize_lesson của Agent
@@ -1128,30 +1420,73 @@ async function handleSummarizeDeck() {
   pushChatHistory('assistant', summary);
 }
 
+function appendGuardrailRefusal() {
+  const refusal = '🛡️ **Ngoài phạm vi tự học:** Mình không cung cấp đáp án để nộp điểm hoặc làm theo chỉ dẫn cố thay đổi hệ thống. Bạn có thể gửi phần bạn đã làm; mình sẽ giải thích khái niệm liên quan từ slide.';
+  appendMessage('bot', refusal);
+  pushChatHistory('assistant', refusal);
+}
+
 async function handleUserChat() {
   const query = chatInput.value.trim();
-  if (!query) return;
-  chatInput.value = '';
-  appendMessage('user', query);
-  pushChatHistory('user', query);
+  const images = pendingChatImages.slice();
+  if (!query && !images.length) return;
 
-  const guardrail = detectGuardrailViolation(query);
-  if (guardrail.blocked) {
-    const refusal = '🛡️ **Ngoài phạm vi tự học:** Mình không cung cấp đáp án để nộp điểm hoặc làm theo chỉ dẫn cố thay đổi hệ thống. Bạn có thể gửi phần bạn đã làm; mình sẽ giải thích khái niệm liên quan từ slide.';
-    appendMessage('bot', refusal);
-    pushChatHistory('assistant', refusal);
+  const guardrail = query ? detectGuardrailViolation(query) : { blocked: false };
+  chatInput.value = '';
+  clearPendingChatImages();
+
+  if (images.length) {
+    appendUserImageMessage(images, query);
+    pushChatHistory('user', query || '(đã gửi ảnh, không kèm chữ)');
+    if (guardrail.blocked) {
+      appendGuardrailRefusal();
+      return;
+    }
+    try {
+      await handleImageChatQuestion(images, query);
+    } catch (error) {
+      console.error('handleImageChatQuestion thất bại:', error);
+      const errorMessage = `⚠️ Có lỗi khi xử lý ảnh này (${error?.message ?? error}). Mở Console (F12) để xem chi tiết.`;
+      appendMessage('bot', errorMessage);
+      pushChatHistory('assistant', errorMessage);
+    }
     return;
   }
 
+  appendMessage('user', query);
+  pushChatHistory('user', query);
+
+  if (guardrail.blocked) {
+    appendGuardrailRefusal();
+    return;
+  }
+
+  try {
+    await handleUserChatUnsafe(query);
+  } catch (error) {
+    // Lưới an toàn cuối cùng - không để màn hình "im lặng" khi có lỗi bất ngờ.
+    // Mở Console (F12) trong trình duyệt để xem chi tiết lỗi in ra bên dưới.
+    console.error('handleUserChat thất bại:', error);
+    const errorMessage = `⚠️ Có lỗi khi xử lý câu hỏi này (${error?.message ?? error}). Mở Console (F12) để xem chi tiết, hoặc thử hỏi lại.`;
+    appendMessage('bot', errorMessage);
+    pushChatHistory('assistant', errorMessage);
+  }
+}
+
+async function handleUserChatUnsafe(query) {
   const lesson = currentLesson();
 
-  // Agent thật (function calling): chỉ chạy khi có Gemini + API key, vì OpenRouter
-  // chưa hỗ trợ trong bản này. Model tự quyết định gọi tool nào/mấy lần trước khi trả
+  // Agent thật (function calling): chỉ chạy khi provider = Gemini, vì OpenRouter chưa
+  // hỗ trợ trong bản này (key không còn ở client — server tự quyết định có đủ điều
+  // kiện gọi Gemini hay không). Model tự quyết định gọi tool nào/mấy lần trước khi trả
   // lời; nếu không đủ điều kiện hoặc agent thất bại, rơi về luồng cũ bên dưới (1 lần
   // search rule-based + 1 lần gọi AI) để không phá tính năng chat hiện có.
-  if (activeProviderId() === 'gemini' && providerCredentials.gemini) {
+  if (activeProviderId() === 'gemini') {
     const agentResult = await runReActChat(lesson, query);
     if (agentResult) {
+      if (!agentResult.allowedPages.length && !agentResult.allowedTranscriptIds.length) {
+        appendTrace('💭 Trả lời trực tiếp — không có tool nào được gọi (thường là câu chào hỏi/xã giao).');
+      }
       appendMessage('bot', agentResult.text);
       pushChatHistory('assistant', agentResult.text);
       interactionLog.push({
@@ -1159,6 +1494,7 @@ async function handleUserChat() {
         type: 'chat',
         text: query.slice(0, 160)
       });
+      logInteraction(lesson, 'chat', query, agentResult.allowedPages);
       if (agentResult.allowedPages[0] != null) lastDiscussedPage = agentResult.allowedPages[0];
       return;
     }
@@ -1186,7 +1522,14 @@ async function handleUserChat() {
     }
   }
 
+  appendTrace(
+    relevantContext.allowedPages.length || relevantContext.allowedTranscriptIds.length
+      ? `🔤 Tìm theo từ khoá (${activeProvider().label}) — khớp ${relevantContext.allowedPages.length} trang, ${relevantContext.allowedTranscriptIds.length} đoạn transcript.`
+      : `🔤 Tìm theo từ khoá (${activeProvider().label}) — không khớp trang nào, sẽ trả lời bằng kiến thức nền nếu có.`
+  );
+
   interactionLog.push({ page: relevantContext.allowedPages[0] ?? null, type: 'chat', text: query.slice(0, 160) });
+  logInteraction(lesson, 'chat', query, relevantContext.allowedPages);
   if (relevantContext.allowedPages[0] != null) lastDiscussedPage = relevantContext.allowedPages[0];
 
   const fallbackAnswer = createHybridOfflineAnswer(lesson, query);
@@ -1355,7 +1698,10 @@ function handleMCQAnswer(button, quizObject) {
   const feedbackBox = document.getElementById(`feedback-q${questionId}`);
   feedbackBox.hidden = false;
 
-  if (chosenOption === question.correct_option) {
+  const isCorrect = chosenOption === question.correct_option;
+  logQuizResult(currentLesson(), citationPageNumber(question.citation), question.question, isCorrect, null);
+
+  if (isCorrect) {
     button.classList.add('correct');
     feedbackBox.className = 'eval-feedback-box PASSED';
     feedbackBox.innerHTML = renderSafeMarkdown(
@@ -1448,7 +1794,13 @@ function sortSlidesByInterest(slides) {
 }
 
 function buildInterestNote(slide) {
-  const labelByType = { chat: 'đã chủ động hỏi', highlight: 'đã bôi đen hỏi', region: 'đã khoanh vùng ảnh hỏi' };
+  const labelByType = {
+    chat: 'đã chủ động hỏi',
+    highlight: 'đã bôi đen hỏi',
+    region: 'đã khoanh vùng ảnh hỏi',
+    image: 'đã gửi ảnh hỏi',
+    quiz_wrong: 'từng trả lời sai quiz'
+  };
   const related = interactionLog.filter(entry => entry.page === slide.page).slice(-3);
   if (!related.length) return '';
   return related.map(entry => `- (${labelByType[entry.type] ?? 'đã hỏi'}): "${entry.text}"`).join('\n');
@@ -1479,6 +1831,72 @@ function startAdaptiveSession() {
     offlinePoolUsedPages: new Set()
   };
   askNextAdaptiveQuestion();
+}
+
+// Quiz cho ĐÚNG 1 trang đang xem, do học viên tự bấm chọn (khác startAdaptiveSession tự chọn
+// trang theo interactionLog). Tái dùng nguyên luồng adaptive đã kiểm chứng (askNextAdaptiveQuestion
+// -> generateAdaptiveQuestion -> renderAdaptiveQuestion -> handleAdaptiveAnswer) bằng cách nạp
+// adaptiveSession với hàng đợi chỉ có 1 "trang" — không viết lại prompt/validator mới.
+function findAdjacentSlideForPageQuiz(lesson, slide) {
+  const slides = lesson?.slides ?? [];
+  const idx = slides.findIndex(item => item.page === slide.page);
+  if (idx === -1) return null;
+  const candidates = [slides[idx + 1], slides[idx - 1]].filter(Boolean);
+  return candidates.find(candidate => (candidate.content ?? '').trim().length > 20) ?? null;
+}
+
+async function handleGeneratePageQuiz() {
+  const lesson = currentLesson();
+  const slide = currentSlide();
+  if (!lesson || !slide) return;
+
+  let targetSlide = slide;
+  let mergeNotice = null;
+
+  if ((slide.content ?? '').trim().length <= 20) {
+    const adjacent = findAdjacentSlideForPageQuiz(lesson, slide);
+    if (adjacent) {
+      targetSlide = {
+        page: slide.page,
+        title: `${slide.title} (gộp thêm Trang ${adjacent.page})`,
+        content: `${slide.content}\n\n[Trang ${adjacent.page}] ${adjacent.title}\n${adjacent.content}`
+      };
+      mergeNotice = `ℹ️ Trang ${slide.page} khá ít nội dung để ra quiz riêng, mình đã gộp thêm Trang ${adjacent.page} ("${adjacent.title}") để đủ căn cứ.`;
+    }
+  }
+
+  switchTab('quiz');
+
+  if ((targetSlide.content ?? '').trim().length <= 20) {
+    quizContainer.innerHTML = '';
+    const notice = document.createElement('div');
+    notice.className = 'scope-notice';
+    notice.textContent =
+      `Trang ${slide.page} chưa có đủ nội dung văn bản (kể cả khi gộp trang liền kề) để tạo quiz riêng — hãy thử trang khác.`;
+    quizContainer.appendChild(notice);
+    return;
+  }
+
+  adaptiveSession = {
+    slideQueue: [targetSlide],
+    slideIndex: 0,
+    attempt: 0,
+    difficulty: 'CHUẨN (kiểm tra hiểu khái niệm cốt lõi)',
+    askedTexts: [],
+    totalAsked: 0,
+    results: [],
+    offlinePool: null,
+    offlinePoolUsedPages: new Set()
+  };
+
+  await askNextAdaptiveQuestion();
+
+  if (mergeNotice) {
+    const notice = document.createElement('div');
+    notice.className = 'scope-notice';
+    notice.textContent = mergeNotice;
+    quizContainer.insertBefore(notice, quizContainer.firstChild);
+  }
 }
 
 async function askNextAdaptiveQuestion() {
@@ -1598,6 +2016,7 @@ async function handleAdaptiveAnswer(button, question, slide, session) {
   const isCorrect = chosenOption === question.correct_option;
   // 'near' = ngộ nhận gần đúng (hiểu một phần) · 'far' = sai hẳn — do AI gắn nhãn lúc sinh câu hỏi (distractor_tiers).
   const tier = isCorrect ? 'correct' : (question.distractor_tiers?.[chosenOption] === 'near' ? 'near' : 'far');
+  logQuizResult(currentLesson(), slide.page, question.question, isCorrect, tier);
   const feedbackBox = document.getElementById('adaptiveFeedback');
   feedbackBox.hidden = false;
 
@@ -1611,6 +2030,11 @@ async function handleAdaptiveAnswer(button, question, slide, session) {
     showAdaptiveContinueActions('advance', slide, session);
     return;
   }
+
+  // Nuôi lại interactionLog (không chỉ session.results, cái này mất khi đổi session) - để
+  // sortSlidesByInterest tự động ưu tiên đúng trang này ở phiên quiz thích ứng SAU, không
+  // cần xây cơ chế "điểm yếu" riêng, tận dụng đúng cơ chế đếm-tương-tác đã có.
+  interactionLog.push({ page: slide.page, type: 'quiz_wrong', text: question.question.slice(0, 160) });
 
   button.classList.add('wrong');
   optionContainer.querySelector(`[data-opt="${question.correct_option}"]`)?.classList.add('correct');

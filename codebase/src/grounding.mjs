@@ -8,7 +8,7 @@ const STOP_WORDS = new Set([
 ]);
 
 const OUT_OF_SCOPE_PATTERNS = [
-  /\b(giai|lam)\s+ho\b/,
+  /\b(giai|lam|viet)\s+(ho|giup)\b/,
   /\bdap\s+an\b.*\b(lab|quiz|bai\s*tap|bai\s*kiem\s*tra)\b.*\b(nop|cham\s*diem)\b/,
   /\b(ignore|bo\s+qua)\b.*\b(previous|truoc|chi\s*thi|huong\s*dan)\b/,
   /\b(system\s*prompt|developer\s*message|jailbreak|prompt\s*injection)\b/,
@@ -206,9 +206,9 @@ export function retrieveRelevantTranscript(lesson, query, options = {}) {
     .slice(0, limit);
 }
 
-export function buildRelevantContext(lesson, query, options = {}) {
-  const slideMatches = retrieveRelevantSlides(lesson, query, options);
-  const transcriptMatches = retrieveRelevantTranscript(lesson, query, options);
+// Tách riêng phần format khỏi phần tìm kiếm để chỗ khác (vd retrieval theo vector
+// embedding trong app.js) có thể tái dùng đúng định dạng context này thay vì chép lại.
+export function formatRetrievedContext(slideMatches, transcriptMatches) {
   const contextParts = [
     ...slideMatches.map(({ slide }) =>
       `[Trang ${slide.page}]\nTiêu đề: ${slide.title}\nNội dung: ${slide.content}`
@@ -223,6 +223,12 @@ export function buildRelevantContext(lesson, query, options = {}) {
     allowedPages: slideMatches.map(item => Number(item.slide.page)),
     allowedTranscriptIds: transcriptMatches.map(item => item.id)
   };
+}
+
+export function buildRelevantContext(lesson, query, options = {}) {
+  const slideMatches = retrieveRelevantSlides(lesson, query, options);
+  const transcriptMatches = retrieveRelevantTranscript(lesson, query, options);
+  return formatRetrievedContext(slideMatches, transcriptMatches);
 }
 
 export function detectGuardrailViolation(query) {
@@ -624,7 +630,7 @@ export function createHybridOfflineAnswer(lesson, query) {
       : 'unknown',
     content: generalAnswer.requiresCurrentInformation
       ? generalAnswer.content
-      : 'Nội dung này không có trong slide và fallback offline chưa có kiến thức nền tương ứng. Hãy nhập Gemini API Key để model giải thích kiến thức ngoài slide; hệ thống sẽ gắn nhãn rõ và không tạo citation giả.',
+      : 'Nội dung này không có trong slide và fallback offline chưa có kiến thức nền tương ứng. Hãy kiểm tra backend đang chạy và đã chọn provider Gemini ở góc trên; hệ thống sẽ gắn nhãn rõ và không tạo citation giả khi trả lời được.',
     citation: null,
     context
   };
