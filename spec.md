@@ -101,11 +101,12 @@ Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
 ---
 
 ## §8. Phân Công & Kế Hoạch
-- **Phân công:**
-  - Thành viên 1: Evidence & Spec (`spec.md`, `validation/survey_log.csv`).
-  - Thành viên 2: System Prompts & Golden Set (`src/prompts.js`, `eval/golden_set.json`).
-  - Thành viên 3: Web Prototype & Logic Code (`src/index.html`, `src/styles.css`, `src/app.js`).
-  - Thành viên 4: Validation & Slide Demo (`demo-slides.pdf`, `validation/user_feedback.md`).
+- **Phân công** (đối chiếu `git log --stat` 30/07 — chỉ Khôi và Hiển có commit tính đến thời điểm này):
+  - **Phạm Nguyễn Đăng Khôi (Leader):** Quiz/self-check agent Python (`codebase/quiz-agent/`) + Q&A vùng ảnh (vision region) trong `src/app.js`/`src/grounding.mjs` + điều phối chung, review chéo trước mỗi mốc.
+  - **Vi Minh Hiển:** đã viết `spec.md`, engine gốc (`src/grounding.mjs`, `src/app.js`, `src/data.js`, `src/prompts.js`), khung `eval/`; tiếp tục phụ trách UI (`src/index.html`, `src/styles.css`) và API/model live (`src/providers.mjs`).
+  - **Đăng Đức:** Evidence & Validation — khảo sát ≥20 người ngoài nhóm + feedback log ≥5 người ngoài nhóm (`validation/`, chưa tồn tại, cần tạo).
+  - **Đỗ Tuấn Sơn:** Kiểm thử — bổ sung case thật từ chatlog vào golden set, chạy lượt live qua Gemini, ghi bảng kết quả (`eval/golden_set.json`, `eval/eval_results.json`).
+  - **Trung:** Demo & Dry-run — soạn `demo-slides.pdf` (6 trang), dry run trước CP5, chuẩn bị case lỗi live cho Q&A.
 - **Willing users ($\ge 3$ người):** Học viên lớp AI Thực Chiến đồng ý thử nghiệm trực tiếp trước demo.
 
 ---
@@ -119,3 +120,4 @@ Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
 | 30/07/2026 13:31 | Đổi MCQ sang câu tình huống với distractor theo ngộ nhận, cấm option lặp/lộ đáp án chéo; tách chatbot thành nguồn–diễn giải–ví dụ | Phản hồi demo cho thấy quiz có thể loại trừ đáp án từ câu trước và chatbot chép nguồn quá cứng; thêm 22 regression checks |
 | 30/07/2026 13:45 | Chuyển Q&A sang chế độ hybrid: cho phép giải thích kiến thức nền ngoài slide với nhãn riêng, không citation giả; thêm glossary VLM/LLM/RAG/embedding/fine-tuning | Slide có thể dùng thuật ngữ như VLM mà không định nghĩa; học viên vẫn cần câu trả lời nền để hiểu nội dung |
 | 30/07/2026 15:10 | Nới Q&A thành broad hybrid: prompt ưu tiên diễn giải/so sánh/ví dụ; citation sai được gỡ và phản hồi được hạ xuống kiến thức ngoài slide thay vì loại | Tránh chatbot trả lời cứng nhắc hoặc rơi về fallback khi model có nội dung hữu ích nhưng không tuân đúng khuôn citation |
+| 30/07/2026 | Chốt lại §8 Phân công theo 5 thành viên thật (đối chiếu git log), thay placeholder "Thành viên 1-4" | Team đủ 5 người; 3/5 chưa có commit — cần khoá rõ ai phụ trách validation/eval-thật/demo để tránh chồng việc |

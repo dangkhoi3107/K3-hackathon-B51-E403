@@ -5,6 +5,18 @@
 - Thời lượng: **1,5 ngày** (một ngày build + một buổi demo)
 - Nhóm: **4-5 người** · zone tối đa 5 nhóm · thi theo lớp
 
+## Nhóm G17 — Zone E403
+
+| Thành viên | Mã HV | Vai trò | Artifact phụ trách |
+|---|---|---|---|
+| Phạm Nguyễn Đăng Khôi (Leader) | 2A202601243 | Quiz-Agent & Vision Q&A + điều phối | `codebase/quiz-agent/`, Canvas |
+| Vi Minh Hiển | 2A202601743 | UI & API (đã viết `spec.md` + engine gốc) | `src/index.html`, `src/styles.css`, `src/providers.mjs` |
+| Đăng Đức | 2A202601787 | Evidence & Validation | `validation/` |
+| Đỗ Tuấn Sơn | 2A202601051 | Kiểm thử — Golden Set thật + lượt live | `eval/` |
+| Trung | _(điền mã HV)_ | Demo & Dry-run | `demo-slides.pdf` |
+
+Chi tiết phân công đầy đủ: [`spec.md` §8](spec.md#§8-phân-công--kế-hoạch).
+
 ## Bắt đầu từ đâu?
 
 1. Đọc **`01-de-bai.md`** để chọn hướng và hiểu tiêu chí.

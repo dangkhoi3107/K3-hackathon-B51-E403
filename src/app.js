@@ -7,6 +7,8 @@ import {
   buildAdaptiveQuestionPrompt,
   buildMisconceptionHintPrompt,
   buildVisionRegionPrompt,
+  buildReActAgentSystemPrompt,
+  REACT_AGENT_TOOLS,
   buildEssayEvaluatorPrompt
 } from './prompts.js';
 import {
@@ -26,6 +28,8 @@ import {
 import {
   AI_PROVIDERS,
   buildProviderRequest,
+  buildGeminiAgentRequest,
+  parseGeminiAgentResponse,
   getProviderConfig,
   isRetryableProviderStatus,
   parseProviderResponse
@@ -45,6 +49,10 @@ let adaptiveSession = null;
 let interactionLog = [];
 let regionDrawActive = false;
 let regionDragOrigin = null;
+let chatHistory = [];
+let lastDiscussedPage = null;
+const MAX_CHAT_HISTORY_TURNS = 8;
+const MAX_AGENT_TOOL_CALLS = 4;
 let pdfRenderTask = null;
 let pdfRenderSequence = 0;
 let resizeTimer = null;
@@ -241,6 +249,8 @@ function setupEventListeners() {
     currentSlideIndex = 0;
     currentQuizData = null;
     interactionLog = [];
+    chatHistory = [];
+    lastDiscussedPage = null;
     resetQuizView();
     renderCurrentSlide();
   });
@@ -530,6 +540,8 @@ async function handlePDFUpload(file) {
     currentSlideIndex = 0;
     currentQuizData = null;
     interactionLog = [];
+    chatHistory = [];
+    lastDiscussedPage = null;
     populateLessonSelector();
     resetQuizView();
     await renderCurrentSlide();
@@ -612,6 +624,8 @@ function removeUploadedLesson() {
   currentSlideIndex = 0;
   currentQuizData = null;
   interactionLog = [];
+  chatHistory = [];
+  lastDiscussedPage = null;
   populateLessonSelector();
   renderDefaultUploadZone();
   resetQuizView();
@@ -677,6 +691,17 @@ function appendMessage(role, content, citation = null) {
   chatMessages.appendChild(msgDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return msgDiv;
+}
+
+// Dòng "dấu vết" hiển thị khi Agent tự quyết định gọi tool - để chứng minh đây là
+// hành động thật của model (xem được cả trong Network tab), không phải giả lập.
+function appendTrace(text) {
+  const div = document.createElement('div');
+  div.className = 'msg bot agent-trace';
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
 }
 
 function setAgentMode(mode, text) {
@@ -776,6 +801,161 @@ async function callLLMAPI(promptText, { json = false, temperature, imageBase64, 
   return null;
 }
 
+// --- Agent thật (function calling) cho Chat: model tự quyết định gọi tool nào, mấy lần,
+// trước khi trả lời - khác hẳn callLLMAPI (luôn đúng 1 prompt -> 1 câu trả lời). Chỉ chạy
+// khi provider = Gemini (function calling chưa hỗ trợ qua OpenRouter trong bản này); nếu
+// không phải Gemini, handleUserChat tự rơi về luồng cũ (1 lần search + 1 lần gọi AI).
+
+async function callGeminiAgentTurn(contents, tools, systemInstruction) {
+  const apiKey = providerCredentials.gemini;
+  if (!apiKey) return null;
+  const model = modelInput.value.trim() || activeProvider().defaultModel;
+
+  const request = buildGeminiAgentRequest({ apiKey, model, systemInstruction, contents, tools, temperature: 0.3 });
+
+  for (let attempt = 0; attempt < API_RETRY_DELAYS_MS.length; attempt += 1) {
+    if (API_RETRY_DELAYS_MS[attempt]) await delay(API_RETRY_DELAYS_MS[attempt]);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    try {
+      const response = await fetch(request.url, { ...request.options, signal: controller.signal });
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => ({}));
+        const message = errorPayload?.error?.message || `HTTP ${response.status}`;
+        const providerError = new Error(message);
+        providerError.status = response.status;
+        throw providerError;
+      }
+      const data = await response.json();
+      setAgentMode('live', `Gemini live · ${model} (agent)`);
+      return parseGeminiAgentResponse(data);
+    } catch (error) {
+      console.warn(`Gemini agent attempt ${attempt + 1} failed:`, error);
+      const retryable = error?.name === 'AbortError' || isRetryableProviderStatus(error?.status);
+      const isLastAttempt = attempt === API_RETRY_DELAYS_MS.length - 1;
+      if (!retryable || isLastAttempt) {
+        setAgentMode('error', 'Gemini agent lỗi · fallback');
+        break;
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+  return null;
+}
+
+function executeSearchLessonContent(lesson, args) {
+  const query = String(args?.query ?? '').trim();
+  if (!query) {
+    return { text: 'Thiếu từ khoá tìm kiếm.', pages: [], transcriptIds: [] };
+  }
+  const context = buildRelevantContext(lesson, query);
+  if (!context.text) {
+    return {
+      text: `Không tìm thấy đoạn nào liên quan tới "${query}" trong slide/transcript bài giảng này.`,
+      pages: [],
+      transcriptIds: []
+    };
+  }
+  return { text: context.text, pages: context.allowedPages, transcriptIds: context.allowedTranscriptIds };
+}
+
+function executeGetPageContent(lesson, args) {
+  const page = Number(args?.page);
+  const slide = getSlideByPage(lesson, page);
+  if (!slide) {
+    return { text: `Không tìm thấy Trang ${page} trong bài giảng này.`, pages: [], transcriptIds: [] };
+  }
+  return {
+    text: `[Trang ${slide.page}]\nTiêu đề: ${slide.title}\nNội dung: ${slide.content}`,
+    pages: [Number(slide.page)],
+    transcriptIds: []
+  };
+}
+
+// Tool "hành động" - không chỉ trả thông tin mà còn tự vận hành UI (tóm tắt cả bài,
+// hoặc chuyển tab + bắt đầu quiz) khi Agent tự quyết định học viên thực sự muốn vậy.
+async function executeSummarizeLesson(lesson) {
+  const summary = await getLessonSummaryText(lesson);
+  return {
+    text: summary,
+    pages: (lesson?.slides ?? []).map(slide => Number(slide.page)),
+    transcriptIds: []
+  };
+}
+
+function executeStartAdaptiveQuiz() {
+  switchTab('quiz');
+  startAdaptiveSession();
+  return {
+    text: 'Đã chuyển sang tab "Kiểm Tra Hiểu Thật" và bắt đầu phiên tự kiểm tra thích ứng cho bài giảng này.',
+    pages: [],
+    transcriptIds: []
+  };
+}
+
+async function runReActChat(lesson, query) {
+  const contents = [
+    ...chatHistory
+      .slice(0, -1)
+      .slice(-6)
+      .map(turn => ({ role: turn.role === 'user' ? 'user' : 'model', parts: [{ text: turn.text }] })),
+    { role: 'user', parts: [{ text: query }] }
+  ];
+  const systemInstruction = buildReActAgentSystemPrompt();
+  const allowedPages = [];
+  const allowedTranscriptIds = [];
+
+  for (let step = 0; step < MAX_AGENT_TOOL_CALLS; step += 1) {
+    const turn = await callGeminiAgentTurn(contents, REACT_AGENT_TOOLS, systemInstruction);
+    if (!turn) return null;
+
+    if (turn.type === 'text') {
+      if (!turn.text) return null;
+      const verification = validateHybridResponse(turn.text, lesson, {
+        allowedPages,
+        allowedTranscriptIds,
+        allowUnlabeledGeneralKnowledge: true,
+        allowCitationDowngrade: true
+      });
+      if (verification.isValid) {
+        return {
+          text: verification.normalizedText ?? turn.text,
+          allowedPages,
+          allowedTranscriptIds
+        };
+      }
+      console.warn('Rejected ungrounded agent answer:', verification.reason);
+      return null;
+    }
+
+    appendTrace(`🔧 Tool: ${turn.name}(${JSON.stringify(turn.args)})`);
+    let toolResult;
+    if (turn.name === 'search_lesson_content') {
+      toolResult = await executeSearchLessonContent(lesson, turn.args);
+    } else if (turn.name === 'get_page_content') {
+      toolResult = await executeGetPageContent(lesson, turn.args);
+    } else if (turn.name === 'summarize_lesson') {
+      toolResult = await executeSummarizeLesson(lesson);
+    } else if (turn.name === 'start_adaptive_quiz') {
+      toolResult = await executeStartAdaptiveQuiz();
+    } else {
+      toolResult = { text: `Tool không tồn tại: ${turn.name}`, pages: [], transcriptIds: [] };
+    }
+    allowedPages.push(...toolResult.pages);
+    allowedTranscriptIds.push(...toolResult.transcriptIds);
+    appendTrace(`📄 Kết quả: ${toolResult.text.slice(0, 160)}${toolResult.text.length > 160 ? '…' : ''}`);
+
+    contents.push(turn.modelTurn);
+    contents.push({
+      role: 'function',
+      parts: [{ functionResponse: { name: turn.name, response: { result: toolResult.text } } }]
+    });
+  }
+
+  return null;
+}
+
 function parseJSONObject(rawText) {
   const text = String(rawText ?? '').trim();
   try {
@@ -804,14 +984,37 @@ function formatLessonContext(lesson) {
   return `${slides}${transcript}`.trim();
 }
 
+// Nhớ hội thoại + chủ đề vừa nói tới, để câu hỏi tiếp nối kiểu "giải thích kỹ hơn",
+// "ví dụ khác" không bị tìm lại từ đầu trên toàn bộ slide (đây là nguyên nhân khiến
+// AI lạc đề khi hỏi tiếp — mỗi lượt chat trước đây coi như một câu hỏi độc lập).
+function pushChatHistory(role, text) {
+  chatHistory.push({ role, text: String(text ?? '').slice(0, 500) });
+  if (chatHistory.length > MAX_CHAT_HISTORY_TURNS) chatHistory.shift();
+}
+
+function formatChatHistoryForPrompt() {
+  return chatHistory
+    .slice(-6)
+    .map(turn => `${turn.role === 'user' ? 'Học viên' : 'Trợ giảng'}: ${turn.text}`)
+    .join('\n');
+}
+
+function getSlideByPage(lesson, page) {
+  return (lesson?.slides ?? []).find(slide => Number(slide.page) === Number(page));
+}
+
 async function handleExplainRegion(text) {
   const lesson = currentLesson();
   const slide = currentSlide();
   appendMessage('user', `Giải thích đoạn bôi đen ở Trang ${slide.page}: “${text}”`);
+  pushChatHistory('user', `Giải thích đoạn bôi đen ở Trang ${slide.page}: "${text}"`);
   interactionLog.push({ page: slide.page, type: 'highlight', text: text.slice(0, 160) });
+  lastDiscussedPage = slide.page;
 
   if (!slide.content?.trim()) {
-    appendMessage('bot', createOfflineExplanation(slide, text));
+    const offline = createOfflineExplanation(slide, text);
+    appendMessage('bot', offline);
+    pushChatHistory('assistant', offline);
     return;
   }
 
@@ -823,12 +1026,15 @@ async function handleExplainRegion(text) {
     });
     if (verification.isValid) {
       appendMessage('bot', llmResponse);
+      pushChatHistory('assistant', llmResponse);
       return;
     }
     console.warn('Rejected ungrounded explain response:', verification.reason);
   }
 
-  appendMessage('bot', createOfflineExplanation(slide, text));
+  const offline = createOfflineExplanation(slide, text);
+  appendMessage('bot', offline);
+  pushChatHistory('assistant', offline);
 }
 
 // Khoanh vùng ảnh (rectangle) trên PDF thật rồi hỏi AI — khác hẳn bôi đen text: đây là
@@ -890,31 +1096,36 @@ async function handleVisionRegionQuestion(imageBase64, pageNum) {
     return;
   }
   appendMessage('bot', llmResponse, `Trang ${pageNum}`);
+  pushChatHistory('assistant', llmResponse);
   interactionLog.push({ page: pageNum, type: 'region', text: llmResponse.slice(0, 160) });
+  lastDiscussedPage = pageNum;
+}
+
+// Logic thuần (không đụng UI) để cả nút "Tóm tắt" lẫn tool summarize_lesson của Agent
+// đều dùng chung, tránh viết lại 2 lần.
+async function getLessonSummaryText(lesson) {
+  const offlineSummary = createOfflineSummary(lesson);
+  if (!offlineSummary.hasContent) return offlineSummary.content;
+
+  const prompt = buildSummarizeDeckPrompt(lesson.title, formatLessonContext(lesson));
+  const llmResponse = await callLLMAPI(prompt);
+  if (llmResponse) {
+    const verification = validateGroundedResponse(llmResponse, lesson);
+    if (verification.isValid) return llmResponse;
+    console.warn('Rejected ungrounded summary response:', verification.reason);
+  }
+  return offlineSummary.content;
 }
 
 async function handleSummarizeDeck() {
   const lesson = currentLesson();
   switchTab('chat');
   appendMessage('user', `Tóm tắt nội dung slide bài giảng ${lesson.title}`);
+  pushChatHistory('user', `Tóm tắt nội dung slide bài giảng ${lesson.title}`);
 
-  const offlineSummary = createOfflineSummary(lesson);
-  if (!offlineSummary.hasContent) {
-    appendMessage('bot', offlineSummary.content);
-    return;
-  }
-
-  const prompt = buildSummarizeDeckPrompt(lesson.title, formatLessonContext(lesson));
-  const llmResponse = await callLLMAPI(prompt);
-  if (llmResponse) {
-    const verification = validateGroundedResponse(llmResponse, lesson);
-    if (verification.isValid) {
-      appendMessage('bot', llmResponse);
-      return;
-    }
-    console.warn('Rejected ungrounded summary response:', verification.reason);
-  }
-  appendMessage('bot', offlineSummary.content);
+  const summary = await getLessonSummaryText(lesson);
+  appendMessage('bot', summary);
+  pushChatHistory('assistant', summary);
 }
 
 async function handleUserChat() {
@@ -922,19 +1133,62 @@ async function handleUserChat() {
   if (!query) return;
   chatInput.value = '';
   appendMessage('user', query);
+  pushChatHistory('user', query);
 
   const guardrail = detectGuardrailViolation(query);
   if (guardrail.blocked) {
-    appendMessage(
-      'bot',
-      '🛡️ **Ngoài phạm vi tự học:** Mình không cung cấp đáp án để nộp điểm hoặc làm theo chỉ dẫn cố thay đổi hệ thống. Bạn có thể gửi phần bạn đã làm; mình sẽ giải thích khái niệm liên quan từ slide.'
-    );
+    const refusal = '🛡️ **Ngoài phạm vi tự học:** Mình không cung cấp đáp án để nộp điểm hoặc làm theo chỉ dẫn cố thay đổi hệ thống. Bạn có thể gửi phần bạn đã làm; mình sẽ giải thích khái niệm liên quan từ slide.';
+    appendMessage('bot', refusal);
+    pushChatHistory('assistant', refusal);
     return;
   }
 
   const lesson = currentLesson();
-  const relevantContext = buildRelevantContext(lesson, query);
+
+  // Agent thật (function calling): chỉ chạy khi có Gemini + API key, vì OpenRouter
+  // chưa hỗ trợ trong bản này. Model tự quyết định gọi tool nào/mấy lần trước khi trả
+  // lời; nếu không đủ điều kiện hoặc agent thất bại, rơi về luồng cũ bên dưới (1 lần
+  // search rule-based + 1 lần gọi AI) để không phá tính năng chat hiện có.
+  if (activeProviderId() === 'gemini' && providerCredentials.gemini) {
+    const agentResult = await runReActChat(lesson, query);
+    if (agentResult) {
+      appendMessage('bot', agentResult.text);
+      pushChatHistory('assistant', agentResult.text);
+      interactionLog.push({
+        page: agentResult.allowedPages[0] ?? null,
+        type: 'chat',
+        text: query.slice(0, 160)
+      });
+      if (agentResult.allowedPages[0] != null) lastDiscussedPage = agentResult.allowedPages[0];
+      return;
+    }
+    console.warn('ReAct agent không trả lời được, rơi về luồng chat 1 lượt cũ.');
+  }
+
+  let relevantContext = buildRelevantContext(lesson, query);
+
+  // Câu hỏi tiếp nối kiểu "giải thích kỹ hơn", "ví dụ khác" gần như không có từ khoá
+  // riêng biệt để tìm slide (retrieval theo token-overlap sẽ ra kết quả rỗng hoặc random)
+  // -> nếu vừa mới bàn về 1 trang cụ thể, ưu tiên tiếp tục đúng trang đó thay vì để AI
+  // tự "tìm" sang một chủ đề không liên quan.
+  const retrievalIsWeak =
+    relevantContext.allowedPages.length === 0 && relevantContext.allowedTranscriptIds.length === 0;
+  if (retrievalIsWeak && lastDiscussedPage != null) {
+    const continuedSlide = getSlideByPage(lesson, lastDiscussedPage);
+    if (continuedSlide?.content?.trim()) {
+      relevantContext = {
+        text: `[Trang ${continuedSlide.page}]\nTiêu đề: ${continuedSlide.title}\nNội dung: ${continuedSlide.content}`,
+        slideMatches: [{ slide: continuedSlide, score: 1 }],
+        transcriptMatches: [],
+        allowedPages: [Number(continuedSlide.page)],
+        allowedTranscriptIds: []
+      };
+    }
+  }
+
   interactionLog.push({ page: relevantContext.allowedPages[0] ?? null, type: 'chat', text: query.slice(0, 160) });
+  if (relevantContext.allowedPages[0] != null) lastDiscussedPage = relevantContext.allowedPages[0];
+
   const fallbackAnswer = createHybridOfflineAnswer(lesson, query);
   const hasLessonContext =
     relevantContext.allowedPages.length > 0 ||
@@ -942,7 +1196,8 @@ async function handleUserChat() {
   const prompt = buildQAGroundedPrompt(
     relevantContext.text,
     query,
-    hasLessonContext
+    hasLessonContext,
+    formatChatHistoryForPrompt()
   );
   const llmResponse = await callLLMAPI(prompt, { temperature: 0.55 });
   if (llmResponse) {
@@ -953,13 +1208,16 @@ async function handleUserChat() {
       allowCitationDowngrade: true
     });
     if (verification.isValid) {
-      appendMessage('bot', verification.normalizedText ?? llmResponse);
+      const finalText = verification.normalizedText ?? llmResponse;
+      appendMessage('bot', finalText);
+      pushChatHistory('assistant', finalText);
       return;
     }
     console.warn('Rejected ungrounded Q&A response:', verification.reason);
   }
 
   appendMessage('bot', fallbackAnswer.content);
+  pushChatHistory('assistant', fallbackAnswer.content);
 }
 
 async function handleGenerateQuiz() {

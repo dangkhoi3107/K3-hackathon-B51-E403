@@ -80,6 +80,54 @@ export function buildProviderRequest({
   };
 }
 
+// Agent thật (function calling) — chỉ Gemini hỗ trợ trong bản này. Khác với
+// buildProviderRequest (luôn 1 prompt -> 1 câu trả lời), hàm này cho phép model
+// TỰ QUYẾT ĐỊNH gọi tool nào trong danh sách, nhiều vòng, trước khi trả lời -
+// code chỉ thực thi tool model chọn, không quyết định thay model.
+export function buildGeminiAgentRequest({ apiKey, model, systemInstruction, contents, tools, temperature }) {
+  const selectedModel = String(model ?? '').trim() || AI_PROVIDERS.gemini.defaultModel;
+  const selectedTemperature = Number.isFinite(Number(temperature))
+    ? Math.min(1, Math.max(0, Number(temperature)))
+    : 0.3;
+  return {
+    url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent`,
+    options: {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
+        contents,
+        ...(tools?.length ? { tools: [{ functionDeclarations: tools }] } : {}),
+        generationConfig: { temperature: selectedTemperature }
+      })
+    }
+  };
+}
+
+// Trả về { type: 'functionCall', name, args } nếu model chọn gọi tool,
+// hoặc { type: 'text', text } nếu model đã quyết định trả lời luôn.
+export function parseGeminiAgentResponse(payload) {
+  const modelContent = payload?.candidates?.[0]?.content;
+  const parts = modelContent?.parts ?? [];
+  const functionCallPart = parts.find(part => part?.functionCall);
+  if (functionCallPart) {
+    return {
+      type: 'functionCall',
+      name: functionCallPart.functionCall.name,
+      args: functionCallPart.functionCall.args ?? {},
+      modelTurn: modelContent
+    };
+  }
+  return {
+    type: 'text',
+    text: parts.map(part => part?.text ?? '').join('').trim(),
+    modelTurn: modelContent
+  };
+}
+
 export function parseProviderResponse(providerId, payload) {
   const provider = getProviderConfig(providerId);
   if (provider.id === 'gemini') {

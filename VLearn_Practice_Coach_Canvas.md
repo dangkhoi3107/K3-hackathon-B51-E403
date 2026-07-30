@@ -90,18 +90,20 @@ Các giới hạn được kiểm soát bằng rule:
 
 ### Phân công nhóm
 
-| Thành viên | Vai trò | Công việc chính | Artifact phụ trách |
-|---|---|---|---|
-| **Khoi** | Product Lead & Spec | Chốt pain point, lát cắt, automation, non-goals; quản lý tiến độ và bảo đảm prototype khớp spec | `spec.md`, Canvas, `README.md` |
-| **Thành viên 2** | Evidence & User Research | Mining chatlog, ghi phương pháp đếm, lưu ví dụ nguyên văn; thực hiện khảo sát và validation | `evidence/`, `survey/`, `validation/` |
-| **Thành viên 3** | Prompt & Evaluation | Xác định learning objectives, viết prompt, xây golden set, quality criteria và chạy evaluation | `eval/`, prompts, kết quả test |
-| **Thành viên 4** | Agent & Backend | Xây agent loop, learner state, generate–validate–regenerate, đánh giá đáp án và chọn hành động tiếp theo | `codebase/backend/`, logs/trace |
-| **Thành viên 5** | Frontend & Demo | Xây giao diện “Tự kiểm tra”, flow hỏi–đáp, màn hình kết quả; chuẩn bị slide, user test và demo | `codebase/frontend/`, `demo-slides.pdf` |
+> Cột "Đã làm" đối chiếu trực tiếp với `git log --stat` — không phải tự nhận.
+> Chỉ 2 người có commit tính đến 30/07: Vi Minh Hiển và Khôi.
+
+| Thành viên | Vai trò | Đã làm (theo git log) | Việc tiếp theo | Artifact phụ trách |
+|---|---|---|---|---|
+| **Phạm Nguyễn Đăng Khôi (Leader)** | Điều phối + Quiz-Agent & Vision Q&A | Viết Quiz/self-check agent Python (`codebase/quiz-agent/`), mở rộng Q&A vùng ảnh (vision region) trong `app.js`/`grounding.mjs`, viết Canvas CP1 | Điều phối tiến độ, review chéo trước mỗi mốc, giữ quiz-agent + vision Q&A ổn định | `codebase/quiz-agent/`, `VLearn_Practice_Coach_Canvas.md` |
+| **Vi Minh Hiển** | UI & API (đi tiếp) | Viết `spec.md`, engine gốc (`grounding.mjs`, `app.js`, `data.js`, `prompts.js`), khung `eval/`, UI (`index.html`, `styles.css`), wiring API (`providers.mjs`) | Tiếp tục phụ trách UI polish + đảm bảo lời gọi API/model live chạy ổn định (key, đổi provider, lỗi 4xx/5xx) | `src/index.html`, `src/styles.css`, `src/providers.mjs` |
+| **Đăng Đức** | Evidence & Validation | Chưa có commit | Khảo sát ≥20 người ngoài nhóm + thu feedback log ≥5 người sau khi prototype chạy được | `validation/` (chưa tồn tại — cần tạo) |
+| **Đỗ Tuấn Sơn** | Kiểm thử — Golden Set thật + lượt live | Chưa có commit | Bổ sung case thật từ chatlog vào golden set, chạy lượt live qua Gemini, ghi bảng kết quả đối chiếu quality bar | `eval/golden_set.json`, `eval/eval_results.json` |
+| **Trung** | Demo & Dry-run | Chưa có commit | Soạn `demo-slides.pdf` (6 trang theo `02-guide.md` §5.1), dry run trước CP5, chuẩn bị case lỗi live cho Q&A | `demo-slides.pdf`, checklist dry-run |
 
 ### Phối hợp
 
-- Khoi và Thành viên 2 xác nhận pain point bằng evidence.
-- Thành viên 3 và Thành viên 4 thống nhất schema câu hỏi, validator và learner state.
-- Thành viên 4 và Thành viên 5 tích hợp agent với giao diện.
-- Khoi và Thành viên 5 chuẩn bị demo script.
-- Mỗi thành viên phải giải thích được phần có tên mình và trình bày ít nhất một phần trong demo.
+- Khôi và Đăng Đức xác nhận pain point bằng evidence thật (khảo sát + mining).
+- Sơn đối chiếu golden set với engine của Hiển; báo lỗi ngược cho Hiển nếu citation/grounding sai.
+- Trung phối hợp với Khôi (quiz-agent) và Hiển (Q&A) để chọn case lỗi live cho demo.
+- Mỗi thành viên phải giải thích được phần có tên mình (kiểm tra tại CP5) và trình bày ít nhất một phần trong demo.
