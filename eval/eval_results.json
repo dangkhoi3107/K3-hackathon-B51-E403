@@ -1,0 +1,40 @@
+{
+  "run_id": "offline-grounding-2026-07-30",
+  "executed_at": "2026-07-30",
+  "runner": "eval/run_golden_set.mjs",
+  "evaluator": "deterministic-offline-grounding-v1",
+  "scope": "Kiểm tra retrieval, citation guard, fallback offline, quiz grounding, weighted rubric và input guardrail. Kết quả này không đại diện cho chất lượng Gemini live.",
+  "quality_bar_from_spec": {
+    "minimum_pass_rate": 85,
+    "citation_requirement": "100% trích dẫn được hiển thị phải tồn tại và khớp source snippet khi áp dụng."
+  },
+  "summary": {
+    "total": 20,
+    "passed": 20,
+    "failed": 0,
+    "pass_rate": 100,
+    "meets_offline_quality_bar": true
+  },
+  "results": [
+    { "id": "TC01", "passed": true, "check": "Few-shot truy xuất Trang 14 và đủ từ khóa." },
+    { "id": "TC02", "passed": true, "check": "Augment truy xuất Trang 15 và nêu cost of error." },
+    { "id": "TC03", "passed": true, "check": "ReAct truy xuất Trang 12 với Thought-Action-Observation." },
+    { "id": "TC04", "passed": true, "check": "Routing và Orchestrator-Worker cùng được lấy từ Trang 15." },
+    { "id": "TC05", "passed": true, "check": "Tool truy xuất Trang 3, không lẫn bài khác." },
+    { "id": "TC06", "passed": true, "check": "Token-latency truy xuất Trang 4." },
+    { "id": "TC07", "passed": true, "check": "Evals/Golden Set truy xuất Trang 33." },
+    { "id": "TC08", "passed": true, "check": "Tóm tắt Day 2 có tối thiểu 3 citation hợp lệ." },
+    { "id": "TC09", "passed": true, "check": "Tóm tắt Day 3 không lẫn deadline/Few-shot/Augment." },
+    { "id": "TC10", "passed": true, "check": "Explain-region giữ đúng Trang 27." },
+    { "id": "TC11", "passed": true, "check": "Đúng core, thiếu secondary => PASSED_WITH_FEEDBACK." },
+    { "id": "TC12", "passed": true, "check": "Đủ core và secondary => PASSED." },
+    { "id": "TC13", "passed": true, "check": "Câu trả lời sai domain => FAILED." },
+    { "id": "TC14", "passed": true, "check": "Có secondary nhưng thiếu core => FAILED." },
+    { "id": "TC15", "passed": true, "check": "Slide thưa chỉ sinh 1 câu, không ép đủ 8-10." },
+    { "id": "TC16", "passed": true, "check": "PDF scan xem được nhưng không sinh summary/quiz từ text rỗng." },
+    { "id": "TC17", "passed": true, "check": "Câu hỏi thời tiết bị từ chối thay vì mặc định Trang 15." },
+    { "id": "TC18", "passed": true, "check": "Citation Trang 99 bị verifier loại." },
+    { "id": "TC19", "passed": true, "check": "Yêu cầu giải hộ bài nộp bị guardrail chặn." },
+    { "id": "TC20", "passed": true, "check": "Prompt injection bị chặn trước khi gọi model." }
+  ]
+}

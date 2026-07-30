@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VLearn Adaptive Learning — Grounding Tutor & Quiz Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-badge">VLEARN AI</div>
+      <span style="font-weight:600; font-size:15px; color:#cbd5e1;">Khoá học AI Thực Chiến</span>
+    </div>
+    
+    <div class="lesson-selector">
+      <select id="lessonSelect">
+        <!-- Loaded dynamically -->
+      </select>
+    </div>
+
+    <div class="api-key-box">
+      <div class="agent-mode" id="agentModeBadge" data-mode="offline">
+        <span class="agent-mode-dot"></span>
+        <span id="agentModeText">Demo có căn cứ</span>
+      </div>
+      <label class="sr-only" for="apiKeyInput">Gemini API Key</label>
+      <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Gemini API Key (tuỳ chọn)">
+    </div>
+  </header>
+
+  <!-- Main Container 2 Columns -->
+  <main class="main-container">
+    
+    <!-- Left Column: Slide Viewer (60%) -->
+    <section class="slide-panel">
+      <div class="slide-controls">
+        <button class="slide-nav-btn" id="prevSlideBtn">◄ Trang Trước</button>
+        <span style="font-size:13px; font-weight:600; color:#94a3b8;">Màn hình bài giảng VLearn Slide</span>
+        <button class="slide-nav-btn" id="nextSlideBtn">Trang Sau ►</button>
+      </div>
+
+      <div class="slide-canvas" id="slideCanvas">
+        <span class="slide-page-badge" id="pageBadge">Trang 4 / 46</span>
+        <div class="mock-slide-view" id="mockSlideView">
+          <h2 class="slide-title" id="slideTitle">Loading Slide...</h2>
+          <div class="slide-content-text" id="slideContentText">
+            Chọn một đoạn trên slide để yêu cầu AI giải thích.
+          </div>
+        </div>
+
+        <div class="pdf-slide-view" id="pdfSlideView" hidden>
+          <div class="pdf-stage" id="pdfStage">
+            <canvas id="pdfCanvas" aria-label="Trang PDF đang hiển thị"></canvas>
+            <div class="pdf-render-status" id="pdfRenderStatus">Đang dựng trang PDF…</div>
+          </div>
+          <details class="pdf-text-panel" open>
+            <summary>
+              Văn bản trích xuất để bôi đen và làm căn cứ cho AI
+              <span class="text-layer-status" id="textLayerStatus"></span>
+            </summary>
+            <div class="slide-content-text pdf-extracted-text" id="pdfTextContent"></div>
+          </details>
+        </div>
+
+        <!-- Floating Selection Tooltip -->
+        <button type="button" class="highlight-action-tooltip" id="highlightTooltip">
+          ✨ AI Giải thích đoạn bôi đen
+        </button>
+      </div>
+
+      <!-- Upload Zone -->
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-zone-inner">
+          <div class="upload-icon">📂</div>
+          <p class="upload-title">Upload Slide PDF để test</p>
+          <p class="upload-subtitle">Kéo thả file PDF vào đây hoặc bấm để chọn file</p>
+          <div class="upload-formats">Hỗ trợ: .pdf — Tối đa 50 trang</div>
+        </div>
+        <div class="upload-progress" id="uploadProgress">
+          <div class="upload-progress-bar" id="uploadProgressBar"></div>
+        </div>
+      </div>
+      <input type="file" id="pdfFileInput" accept=".pdf" style="display:none">
+
+    </section>
+
+    <!-- Right Column: AI Assistant & Assessment Agent (40%) -->
+    <section class="agent-panel">
+      <!-- Tabs -->
+      <div class="tab-header">
+        <button class="tab-btn active" id="tabChatBtn">💬 AI Tutor Chat</button>
+        <button class="tab-btn" id="tabQuizBtn">🎯 Kiểm Tra Hiểu Thật (Quiz)</button>
+      </div>
+
+      <!-- Tab 1: Chat View -->
+      <div class="tab-content active" id="tabChat">
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg bot">
+            👋 Chào học viên! Mình là Trợ giảng AI VLearn. Bạn có thể bôi đen bất kỳ đoạn văn bản nào trên Slide bên trái để yêu cầu giải thích, hỏi đáp thắc mắc hoặc bấm <b>Kiểm Tra Hiểu Thật</b> để làm Quiz 3 phút nhé!
+          </div>
+        </div>
+
+        <!-- Quick Action Pills -->
+        <div class="quick-actions">
+          <button class="action-pill" id="pillSummarize">📋 Tóm tắt slide bài giảng</button>
+          <button class="action-pill" id="pillQA">❓ Khi nào chọn Augment?</button>
+        </div>
+
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" placeholder="Hỏi đáp kiến thức hoặc thắc mắc về slide...">
+          <button id="sendChatBtn">Gửi</button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Quiz View -->
+      <div class="tab-content" id="tabQuiz">
+        <div style="padding: 16px; border-bottom: 1px solid var(--panel-border); background: #0f172a; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:700; font-size:14px; color:#fff;">End-of-Session Adaptive Quiz</div>
+            <div id="quizScopeText" style="font-size:12px; color:#94a3b8;">Câu hỏi chỉ được giữ lại khi khớp nguồn trên slide</div>
+          </div>
+          <button class="btn-submit-essay" id="btnGenerateQuiz" style="margin:0;">⚡ Khởi tạo Quiz</button>
+        </div>
+
+        <div class="quiz-container" id="quizContainer">
+          <div style="text-align:center; padding:40px; color:#94a3b8; font-size:13px;">
+            Bấm <b>"⚡ Khởi tạo Quiz"</b> để bắt đầu bài kiểm tra hiểu thật 3 phút cho bài học này!
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
