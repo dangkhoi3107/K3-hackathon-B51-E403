@@ -1,0 +1,103 @@
+REFLECTION CÁ NHÂN — MINI HACKATHON AI (BATCH 03)
+
+Họ tên: Đỗ Tuấn Sơn
+Mã học viên: 01051
+Sản phẩm: VLearn Grounding Tutor & End-of-Session Quiz Agent (VLearn Practice Coach)
+Vai trò: Kiểm thử — xây Golden Set thật + chạy các lượt live (đo & validate)
+
+
+1. VAI TRÒ & PHẠM VI CỦA TÔI
+
+Tôi phụ trách khối Kiểm thử của nhóm — tương ứng R4 trong rubric (spec §7 + thư
+mục eval/). Cụ thể tôi làm hai việc gắn với nhau: (a) dựng bộ Golden Set thật để
+đo prototype có bám đúng nguồn tài liệu và có từ chối đúng lúc không, và (b) chạy
+các lượt gọi AI live thật rồi ghi lại log thô để đối chiếu. Đây cũng là phần tôi
+đứng ra giải thích tại checkpoint theo vibe-coding rule.
+
+
+2. PHẦN MÌNH ĐÃ LÀM (CÓ SỐ LIỆU)
+
+Golden Set — eval/golden_set.json:
+- 20 test case, không chọn ngẫu nhiên mà map thẳng vào 4 lớp chỗ khó ở spec §5:
+    · ① nguồn sự thật: 6 case
+    · ② mơ hồ / thiếu thông tin: 4 case
+    · ③ ngoài phạm vi / thẩm quyền: 2 case
+    · ④ đặc thù domain: 8 case
+- Không chỉ có happy path. Bộ này cố tình gài các case "phải từ chối" (must_refuse
+  = 2): slide chỉ có tiêu đề mà không đủ nội dung (adversarial_sparse_slide), PDF
+  scan không có text layer (adversarial_scan_only_pdf), trích dẫn Trang 99 không
+  tồn tại (invalid_citation), yêu cầu giải hộ bài nộp điểm (out_of_scope_assessment)
+  và prompt injection.
+- 4 case calibration riêng cho phần chấm tự luận theo rubric có trọng số
+  (complete / near_miss / missing_core / wrong) để kiểm tra hệ chấm phân biệt được
+  "đúng ý chính nhưng thiếu ý phụ" khác với "sai trọng tâm".
+- Mỗi case ghi rõ lesson_id, câu hỏi đầu vào, trang trích dẫn kỳ vọng và từ khóa
+  bắt buộc — để việc chấm đạt/không đạt là tất định, không phụ thuộc cảm tính.
+
+Chạy đo:
+- Viết/kiểm bộ chạy offline (eval/run_golden_set.mjs) + 50 unit check. Kết quả
+  eval_results.json: 20/20 pass, pass_rate 100%, vượt quality bar 85% chốt ở spec.
+  Kèm regression check về đa dạng quiz: 24/24 phương án là duy nhất, 0 rò rỉ đáp án
+  chéo giữa các câu.
+- Chạy lượt LIVE thật bằng Gemini và ghi eval/run_log.jsonl (input, output đầy đủ,
+  latency): CASE 1 happy path sinh quiz Double Diamond bám đúng transcript kèm quote
+  (latency ~2.6s); CASE 2 nội dung quá mỏng → agent trả status "insufficient_content"
+  và nêu lý do, KHÔNG bịa câu hỏi (latency ~1.4s). Đây là bằng chứng cho quyết định
+  automation Conditional trong spec.
+
+Điểm tôi giữ đúng nguyên tắc: trong eval_results.json tôi ghi thẳng dòng scope
+"Kết quả này không đại diện cho chất lượng model live" — vì evaluator offline chỉ
+kiểm phần plumbing (retrieval, dọn/hạ cấp citation, guardrail), không kiểm được
+chất lượng suy luận của model. Không tô hồng con số.
+
+
+3. AI ĐÃ HỖ TRỢ THẾ NÀO
+
+- Tôi dùng AI để phác nhanh khung runner và schema JSON của Golden Set, sau đó tự
+  sửa lại tiêu chí đạt/không đạt cho khớp spec §5 — phần "map case vào lớp chỗ khó
+  nào và vì sao phải từ chối" là do tôi quyết, AI không tự biết.
+- AI giúp sinh biến thể câu hỏi/đáp án cho các case calibration tự luận, nhưng tôi
+  là người chốt đâu là "đúng core / thiếu core / near miss" — nếu để AI tự gán nhãn
+  thì mất luôn ý nghĩa của bộ test.
+- Khi đọc log live, AI giúp tôi tóm nhanh output dài của model; còn việc đối chiếu
+  quote với nguồn để xác nhận có bịa hay không thì tôi làm tay.
+
+Tóm lại: AI lo tốc độ gõ, tôi lo tiêu chí và phán quyết đạt/không đạt.
+
+
+4. MỘT BÀI HỌC TỪ CASE FAIL CỦA NHÓM
+
+Case fail: Bộ test offline của tôi báo 20/20 PASS, nhưng khi tôi chạy lượt LIVE
+thật thì MỌI lời gọi AI trong src/ đều lỗi — model Gemini cấu hình sẵn
+(gemini-2.5-flash) đã bị deprecate và trả 404 cho key mới. Nghĩa là ở thời điểm đó
+sản phẩm "xanh" trên bảng eval của tôi nhưng thực tế không gọi được model nào.
+
+Vì sao lọt: Golden Set của tôi chạy trên evaluator tất định offline — nó chứng minh
+được logic retrieval, dọn citation, guardrail hoạt động, nhưng cố tình không chạm
+tới API thật nên không thể phát hiện lỗi ở tầng provider/model. Tôi đã coi "100% pass"
+gần như đồng nghĩa "sản phẩm chạy được", đó là chỗ sai.
+
+Đã sửa: nhóm cập nhật sang gemini-3.1-flash-lite (đúng model production). Về phía
+tôi, chính lượt LIVE mới lộ ra bug — nên tôi tách bạch rõ hai loại bằng chứng và
+bổ sung một "smoke test" gọi model thật tối thiểu trước mỗi lần demo/đo.
+
+Bài học rút ra:
+1) Golden Set offline và lượt chạy live trả lời hai câu hỏi KHÁC nhau — "logic có
+   đúng không" vs "hệ thống có thực sự chạy được không". Thiếu một trong hai là
+   mù một nửa. Pass 100% offline không bao giờ được đọc thành "đã chạy được".
+2) Con số phải đi kèm phạm vi của nó. Việc tôi ghi rõ scope "không đại diện chất
+   lượng live" ngay trong file kết quả chính là thứ giúp cả nhóm không hiểu nhầm
+   và giúp tôi định vị đúng nơi bug nằm.
+3) Test có giá trị nhất không phải khi nó xanh, mà khi nó gài sẵn được các ca phải
+   từ chối (bịa, citation giả, out-of-scope, injection) — vì với sản phẩm học tập,
+   một câu hỏi/đáp án sai khiến học viên tự học sai ngay lúc họ tin tưởng nhất.
+
+
+5. NẾU LÀM LẠI
+
+- Đưa smoke test gọi model thật vào ngay từ đầu, đặt cạnh bộ offline, để "live health"
+  luôn được kiểm cùng lúc với "logic".
+- Nâng Golden Set lấy nhiều hơn từ chính các cụm "nhiều học viên hỏi trùng 1 trang"
+  mining được từ chatlog, thay vì tự nghĩ đề — bám bằng chứng thật sát hơn.
+- Ghi latency và tỉ lệ từ chối đúng của lượt live thành một bảng nhỏ để so giữa các
+  lần chạy, thay vì chỉ dừng ở log thô.
