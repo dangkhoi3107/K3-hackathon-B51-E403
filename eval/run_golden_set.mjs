@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { VLEARN_LESSONS } from '../src/data.js';
 import {
+  createHybridOfflineAnswer,
   createOfflineAnswer,
   createOfflineExplanation,
   createOfflineQuiz,
@@ -118,9 +119,16 @@ function evaluateCase(testCase) {
     };
   }
 
-  if (testCase.category === 'out_of_knowledge') {
-    const answer = createOfflineAnswer(lesson, testCase.input_query);
-    return { passed: !answer.found, observed: answer.content };
+  if (testCase.category === 'external_knowledge_definition') {
+    const answer = createHybridOfflineAnswer(lesson, testCase.input_query);
+    return {
+      passed:
+        answer.found &&
+        answer.content.includes(`**${testCase.required_label}**`) &&
+        containsAll(answer.content, testCase.expected_keywords) &&
+        !/\[Trang \d+\]/.test(answer.content),
+      observed: answer.content
+    };
   }
 
   if (testCase.category === 'invalid_citation') {
@@ -151,7 +159,7 @@ const results = goldenSet.map(testCase => {
 const passed = results.filter(result => result.passed).length;
 const report = {
   evaluator: 'deterministic-offline-grounding-v1',
-  scope: 'Retrieval, citation guard, offline fallback, quiz grounding, rubric và guardrail; không đại diện cho chất lượng Gemini live.',
+  scope: 'Provider adapter, retrieval, citation cleanup/downgrade, offline fallback, quiz grounding, rubric và guardrail; không đại diện cho chất lượng model live.',
   total: results.length,
   passed,
   failed: results.length - passed,

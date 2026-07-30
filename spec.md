@@ -49,7 +49,7 @@ Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
   1. Không tạo bài quiz tính điểm chính thức cho môn học.
   2. Không làm hệ thống điểm danh tự động.
   3. Không thay thế kênh hỗ trợ TA trên Discord.
-- **Mức prototype nhắm tới:** [x] Working (Web App độc lập `src/index.html` + `src/app.js` + gọi API Gemini thật).
+- **Mức prototype nhắm tới:** [x] Working (Web App độc lập `src/index.html` + `src/app.js` + adapter gọi OpenRouter/Gemini thật).
 - **Automation:** [x] Augment / Conditional. *Lý do (Cost-of-Error):* Nếu AI tạo Quiz hoặc chấm tự luận sai, học viên hiểu sai kiến thức $\rightarrow$ đắt. Do đó AI tạo và chấm nhưng LUÔN dẫn nguồn `[trang N]` và `source_snippet` để học viên kiểm chứng.
 - **§4b. Nguyên tắc đã áp dụng (HAX/PAIR):**
   | Nguyên tắc | Áp cụ thể vào đâu trong prototype |
@@ -65,14 +65,14 @@ Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
 
 | STT | Tình huống cụ thể | Lớp chỗ khó | Hành vi mong muốn | Nguyên tắc áp |
 |---|---|---|---|---|
-| 1 | AI bịa câu hỏi/giải thích không xuất hiện trong tài liệu. | ① Nguồn sự thật | Áp dụng quy trình **Extract-then-Generate**. Chỉ sinh câu hỏi từ `source_snippet` thực tế. | HAX G2, PAIR Trust |
-| 2 | AI trích dẫn nhầm trang slide không tồn tại. | ① Nguồn sự thật | Qua tầng **Citation Verifier (Fuzzy Match)**. Nếu match < 0.6 $\rightarrow$ Fallback: *"Không tìm thấy trích dẫn phù hợp"*. | HAX G10, PAIR Error |
+| 1 | AI bịa câu hỏi/giải thích hoặc trình bày kiến thức nền như thể nằm trong tài liệu. | ① Nguồn sự thật | Quiz vẫn áp dụng **Extract-then-Generate**. Q&A được phép trả lời rộng; UI tự gắn nhãn kiến thức ngoài slide và gỡ citation đặt sai vùng thay vì loại toàn bộ phản hồi hữu ích. | HAX G2, PAIR Trust |
+| 2 | AI trích dẫn nhầm trang slide không tồn tại. | ① Nguồn sự thật | Quiz/summary vẫn kiểm tra nghiêm. Với Q&A, citation sai bị gỡ và phản hồi được phân loại lại thành **Kiến thức nền ngoài slide**, không còn hiển thị như nguồn bài giảng. | HAX G10, PAIR Error |
 | 3 | Slide bài giảng chỉ có hình ảnh/sơ đồ, ít chữ. | ② Thiếu thông tin | Context Assembler tự động load `transcript/` bài nói bổ sung bối cảnh. | HAX G10 |
 | 4 | Dữ liệu slide quá ít không đủ sinh 10 câu quiz. | ② Thiếu thông tin | Trả về số câu hỏi ít hơn (vd: 6 câu) thay vì bịa cho đủ 10 câu. | HAX G2, G10 |
 | 5 | User nhập prompt đòi AI giải hộ bài lab/quiz nộp điểm. | ③ Ngoài phạm vi | Security Guardrail từ chối: *"Mình chỉ hỗ trợ kiểm tra tự luyện. Bạn hãy tự làm bài lab nộp nhé!"* | HAX G10, PAIR Boundary |
 | 6 | User gõ Prompt Injection cố tình phá System Prompt. | ③ Ngoài phạm vi | Intent Router chặn ngay từ lớp Input Guardrail. | PAIR Security |
 | 7 | AI dùng sai thuật ngữ chuyên ngành (nhầm ReAct và Routing). | ④ Đặc thù domain | Khống chế bằng Domain Guardrails định nghĩa chuẩn trong System Prompt. | HAX G2 |
-| 8 | Gemini API bị timeout giữa chừng khi đang sinh Quiz. | Lỗi hệ thống | Retry 2 lần. Nếu vẫn lỗi $\rightarrow$ Trả về tập Quiz rút gọn N câu kèm thông báo UI. | PAIR Graceful Failure |
+| 8 | Provider AI bị timeout, hết quota hoặc key không hợp lệ khi đang sinh Quiz. | Lỗi hệ thống | Chỉ retry timeout/429/5xx; lỗi 4xx dừng ngay và chuyển fallback có căn cứ, đồng thời hiển thị provider/status trên badge. | PAIR Graceful Failure |
 
 ---
 
@@ -89,14 +89,14 @@ Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
 ## §7. Kiểm Thử
 - **Chiều chất lượng:**
   1. *Độ chính xác trích dẫn:* 100% câu hỏi & giải thích có trích dẫn verified `[trang N]` đúng với tài liệu gốc.
-  2. *Chống bịa đặt (Hallucination Rate):* 0% khái niệm bịa ngoài Slide/Transcript.
+  2. *Phân tách nguồn:* 0% kiến thức nền ngoài Slide/Transcript bị trình bày như nội dung của bài giảng; 100% phần mở rộng được gắn nhãn và không có citation trang giả.
   3. *An toàn thẩm quyền:* 100% yêu cầu giải hộ bài lab nộp điểm bị từ chối.
 - **Golden set (20 case trong `eval/golden_set.json`):**
   - 10 case bài học thường (Day 1, Day 2).
   - 5 case "câu tự luận gần đúng nhưng thiếu ý cốt lõi" (Calibrate Weighted Rubric).
   - 5 case "adversarial" (Slide ít chữ/nhiều hình) kiểm tra tính an toàn không bịa câu hỏi.
 - **Quality bar (Chốt từ 23:59):** *"Đạt khi $\ge 85\%$ case qua bộ kiểm thử Golden Set và 100% trích dẫn verified chính xác."*
-- **Kết quả lượt deterministic offline (30/07/2026):** **20/20 case đạt (100%)** với retrieval, citation guard, fallback, quiz grounding, weighted rubric và input guardrail; chi tiết ở `eval/eval_results.json`. Kết quả này **không thay thế** lượt đánh giá Gemini live.
+- **Kết quả lượt deterministic offline (30/07/2026):** **20/20 case đạt (100%)** với retrieval, citation guard, fallback, quiz grounding, weighted rubric và input guardrail; chi tiết ở `eval/eval_results.json`. Kết quả này **không thay thế** lượt đánh giá model live qua OpenRouter/Gemini.
 
 ---
 
@@ -116,3 +116,6 @@ Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
 | 30/07/2026 11:30 | Thêm luồng Extract-then-Generate & Source Snippet Verifier | Chống bịa kiến thức tuyệt đối khi tạo Quiz |
 | 30/07/2026 11:34 | Chuyển sang chiến lược Standalone Web App Prototype | Khắc phục rào cản không can thiệp backend VLearn thật |
 | 30/07/2026 12:22 | Render trực tiếp trang PDF; thay fallback hard-code bằng retrieval theo lesson; siết citation/source verifier và rubric core | Khắc phục lỗi upload chỉ hiện text và agent trả lời sai/nhảy mặc định sang Trang 15; đối chiếu `eval/eval_results.json` |
+| 30/07/2026 13:31 | Đổi MCQ sang câu tình huống với distractor theo ngộ nhận, cấm option lặp/lộ đáp án chéo; tách chatbot thành nguồn–diễn giải–ví dụ | Phản hồi demo cho thấy quiz có thể loại trừ đáp án từ câu trước và chatbot chép nguồn quá cứng; thêm 22 regression checks |
+| 30/07/2026 13:45 | Chuyển Q&A sang chế độ hybrid: cho phép giải thích kiến thức nền ngoài slide với nhãn riêng, không citation giả; thêm glossary VLM/LLM/RAG/embedding/fine-tuning | Slide có thể dùng thuật ngữ như VLM mà không định nghĩa; học viên vẫn cần câu trả lời nền để hiểu nội dung |
+| 30/07/2026 15:10 | Nới Q&A thành broad hybrid: prompt ưu tiên diễn giải/so sánh/ví dụ; citation sai được gỡ và phản hồi được hạ xuống kiến thức ngoài slide thay vì loại | Tránh chatbot trả lời cứng nhắc hoặc rơi về fallback khi model có nội dung hữu ích nhưng không tuân đúng khuôn citation |

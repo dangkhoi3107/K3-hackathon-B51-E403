@@ -10,7 +10,7 @@ VLearn AI Agent là prototype trợ giảng AI thông minh cho nền tảng VLea
 |---|-----------|-------|
 | 1 | **Giải thích vùng bôi đen** | Bôi đen text trên slide → AI giải thích kèm trích dẫn trang |
 | 2 | **Tóm tắt bài giảng** | Tổng hợp mục tiêu, key takeaways, bản đồ slide |
-| 3 | **Hỏi đáp kiến thức (Grounded Q&A)** | Chat tự do, AI chỉ trả lời dựa trên nội dung slide + transcript |
+| 3 | **Hỏi đáp kiến thức (Hybrid Q&A)** | Chat tự do, tách nguồn slide/transcript và kiến thức nền ngoài slide |
 | 4 | **Quiz kiểm tra hiểu thật** | 7-8 MCQ + 1-2 tự luận, chấm bằng Weighted Rubric |
 
 Prototype chạy **hoàn toàn trên trình duyệt** (client-side), không cần backend server.
@@ -42,15 +42,18 @@ DAY05_G17_E403/
 ### Bước 1 — Cấu hình API Key (tùy chọn)
 
 Prototype tĩnh không tự đọc `.env` trong trình duyệt để tránh vô tình công khai key.
-Sau khi mở web, nhập Gemini API Key vào ô ở góc phải header nếu muốn dùng AI live:
+Sau khi mở web, chọn nhà cung cấp ở góc phải header, nhập model và API Key tương ứng:
 
 ```env
+OPENROUTER_API_KEY=<your-openrouter-api-key>
+OPENROUTER_MODEL=openrouter/free
+
 GEMINI_API_KEY=<your-gemini-api-key>
 GEMINI_MODEL=gemini-2.5-flash
 VLEARN_ENV=development
 ```
 
-> **Lưu ý:** Nếu không có API Key hoặc API lỗi, prototype chuyển sang **fallback offline có căn cứ**: truy xuất trực tiếp nội dung bài đang mở, từ chối câu ngoài tài liệu và không mặc định sang một slide khác.
+OpenRouter là lựa chọn mặc định với model `openrouter/free`; có thể nhập model slug khác. Khi đổi provider, key và model của mỗi bên được giữ riêng trong bộ nhớ phiên. Không có API Key hoặc API lỗi thì prototype dùng **fallback offline lai**.
 
 ### Bước 2 — Khởi động server
 
@@ -80,7 +83,7 @@ Truy cập: **http://localhost:3000**
 4. Thông báo xác nhận hiện trong khung chat bên phải
 5. Bấm **✕ Xóa** trên upload zone để quay về dữ liệu mẫu
 
-> **Giới hạn:** Hiển thị tối đa 50 trang. PDF dạng ảnh scan vẫn xem được, nhưng vì không có text layer nên AI sẽ không tóm tắt/hỏi đáp/quiz để tránh bịa nội dung.
+> **Giới hạn:** Hiển thị tối đa 50 trang. PDF dạng ảnh scan vẫn xem được, nhưng AI không thể khẳng định nội dung của trang nếu thiếu text layer. Chatbot vẫn có thể giải thích kiến thức nền chung khi người dùng nêu rõ thuật ngữ.
 
 ### 4.2 — Giải Thích Đoạn Bôi Đen (Explain Region)
 
@@ -96,8 +99,10 @@ Truy cập: **http://localhost:3000**
 ### 4.4 — Hỏi Đáp Kiến Thức (Grounded Q&A)
 
 1. Gõ câu hỏi vào ô chat → bấm **Gửi** hoặc nhấn **Enter**
-2. AI trả lời dựa **strictly** trên nội dung slide + transcript
-3. Nếu thông tin không có trong bài giảng → AI từ chối trả lời (không bịa)
+2. AI trả lời tự nhiên theo câu hỏi, có thể bổ sung định nghĩa, nguyên lý, so sánh, ứng dụng, hạn chế và ví dụ thay vì chỉ chép lại slide
+3. Nếu slide chỉ nhắc thuật ngữ mà không định nghĩa, AI vẫn trả lời bằng kiến thức nền. Hệ thống tự chuẩn hóa nhãn **“Kiến thức nền ngoài slide”** nếu model quên ghi nhãn
+4. Nếu model tạo citation sai nhưng phần giải thích vẫn hữu ích, hệ thống gỡ citation và chuyển nội dung sang kiến thức ngoài slide thay vì loại toàn bộ câu trả lời
+5. Nội dung cần dữ liệu thời gian thực hoặc không đủ chắc chắn vẫn bị từ chối thay vì đoán
 
 **Guardrail tích hợp:**
 - Yêu cầu "giải hộ bài lab" hoặc "đáp án quiz nộp điểm" → bị chặn tự động
@@ -105,8 +110,10 @@ Truy cập: **http://localhost:3000**
 ### 4.5 — Quiz Kiểm Tra Hiểu Thật
 
 1. Chuyển sang tab **"🎯 Kiểm Tra Hiểu Thật (Quiz)"**
-2. Bấm **"⚡ Khởi tạo Quiz"** → hệ thống sinh 8-10 câu hỏi
+2. Bấm **"⚡ Khởi tạo Quiz"** → hệ thống sinh tối đa 8-10 câu; tài liệu ít nguồn độc lập thì trả ít hơn để tránh lặp hoặc bịa
 3. **Câu trắc nghiệm (MCQ):** Click đáp án A/B/C/D
+   - Các option không được tái sử dụng giữa các câu; distractor ưu tiên ngộ nhận gần đúng và câu tình huống
+   - Trích dẫn được khóa trước khi trả lời và chỉ mở sau khi chọn đáp án
    - ✅ Xanh = đúng (kèm giải thích + trích dẫn)
    - ❌ Đỏ = sai (hiện đáp án đúng + giải thích)
 4. **Câu tự luận:** Viết trả lời → bấm **"Chấm điểm"**
@@ -119,10 +126,10 @@ Truy cập: **http://localhost:3000**
 
 | Chế độ | Điều kiện | Hành vi |
 |--------|-----------|---------|
-| **Live (Gemini API)** | Nhập API Key trực tiếp trên header | Gọi Gemini, sau đó kiểm tra trích dẫn và source snippet trước khi hiển thị |
-| **Offline (Fallback)** | Không có API Key, API lỗi hoặc output không qua verifier | Truy xuất theo từ khóa từ đúng bài đang mở; không có nguồn thì từ chối |
+| **Live (OpenRouter/Gemini)** | Chọn provider, model và nhập API Key trên header | Gọi provider đang chọn, sau đó dùng chung verifier trích dẫn/source snippet trước khi hiển thị |
+| **Offline (Fallback)** | Không có API Key, API lỗi hoặc output không qua verifier | Truy xuất đúng bài và dùng glossary cục bộ cho một số thuật ngữ AI; phần ngoài slide luôn có nhãn |
 
-API Key chỉ nằm trong ô nhập của phiên trình duyệt hiện tại, không được ghi vào source hoặc local storage.
+API Key của từng provider chỉ nằm trong bộ nhớ phiên trình duyệt hiện tại, không được ghi vào source hoặc local storage.
 
 ---
 
@@ -140,7 +147,7 @@ API Key chỉ nằm trong ô nhập của phiên trình duyệt hiện tại, kh
 - **Không cần cài đặt npm/node** — chỉ cần Python cho HTTP server
 - **PDF.js** được tải từ CDN (cần internet lần đầu load trang)
 - File `.env` **không** được commit lên Git (đã có trong `.gitignore`); bản web tĩnh không tự đọc file này
-- Toàn bộ logic chạy client-side, **không gửi dữ liệu lên server nào** ngoài Gemini API (nếu có key)
+- Toàn bộ logic chạy client-side; prompt chỉ được gửi đến provider đang chọn (OpenRouter hoặc Gemini) khi có key
 
 ### Kiểm tra logic grounding (tùy chọn)
 

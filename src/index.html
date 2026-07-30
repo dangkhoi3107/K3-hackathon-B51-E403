@@ -28,10 +28,17 @@
     <div class="api-key-box">
       <div class="agent-mode" id="agentModeBadge" data-mode="offline">
         <span class="agent-mode-dot"></span>
-        <span id="agentModeText">Demo có căn cứ</span>
+        <span id="agentModeText">Nguồn + kiến thức nền</span>
       </div>
-      <label class="sr-only" for="apiKeyInput">Gemini API Key</label>
-      <input type="password" id="apiKeyInput" autocomplete="off" placeholder="Gemini API Key (tuỳ chọn)">
+      <label class="sr-only" for="providerSelect">Nhà cung cấp AI</label>
+      <select id="providerSelect" class="provider-select" aria-label="Nhà cung cấp AI">
+        <option value="openrouter" selected>OpenRouter</option>
+        <option value="gemini">Gemini</option>
+      </select>
+      <label class="sr-only" for="modelInput">Model AI</label>
+      <input type="text" id="modelInput" class="model-input" autocomplete="off" value="openrouter/free" aria-label="Model AI">
+      <label class="sr-only" for="apiKeyInput">API Key</label>
+      <input type="password" id="apiKeyInput" class="api-key-input" autocomplete="off" placeholder="OpenRouter API Key">
     </div>
   </header>
 
@@ -103,7 +110,7 @@
       <div class="tab-content active" id="tabChat">
         <div class="chat-messages" id="chatMessages">
           <div class="msg bot">
-            👋 Chào học viên! Mình là Trợ giảng AI VLearn. Bạn có thể bôi đen bất kỳ đoạn văn bản nào trên Slide bên trái để yêu cầu giải thích, hỏi đáp thắc mắc hoặc bấm <b>Kiểm Tra Hiểu Thật</b> để làm Quiz 3 phút nhé!
+            👋 Chào học viên! Mình có thể giải thích nội dung slide có trích dẫn và bổ sung kiến thức nền ngoài slide với nhãn phân biệt rõ. Bạn cũng có thể bôi đen một đoạn hoặc bấm <b>Kiểm Tra Hiểu Thật</b> để làm Quiz 3 phút.
           </div>
         </div>
 
@@ -114,7 +121,7 @@
         </div>
 
         <div class="chat-input-area">
-          <input type="text" id="chatInput" placeholder="Hỏi đáp kiến thức hoặc thắc mắc về slide...">
+          <input type="text" id="chatInput" placeholder="Hỏi về slide hoặc một khái niệm nền như VLM, RAG...">
           <button id="sendChatBtn">Gửi</button>
         </div>
       </div>

@@ -15,6 +15,44 @@ const OUT_OF_SCOPE_PATTERNS = [
   /\b(reveal|hien|doc|xuat)\b.*\b(prompt|chi\s*thi\s*an|api\s*key)\b/
 ];
 
+const GENERAL_KNOWLEDGE_GLOSSARY = [
+  {
+    aliases: ['vlm', 'vision language model', 'vision-language model'],
+    term: 'VLM (Vision-Language Model)',
+    definition: 'VLM là mô hình AI kết hợp khả năng xử lý thị giác và ngôn ngữ để liên hệ nội dung hình ảnh với văn bản.',
+    capabilities: 'VLM có thể được dùng cho mô tả ảnh, hỏi đáp về hình ảnh, tìm kiếm ảnh–văn bản và các bài toán suy luận đa phương thức.',
+    distinction: 'Khác với LLM thuần văn bản, VLM nhận thêm tín hiệu thị giác; kiến trúc cụ thể có thể kết hợp bộ mã hóa ảnh, mô hình ngôn ngữ và một thành phần nối hai không gian biểu diễn.'
+  },
+  {
+    aliases: ['llm', 'large language model'],
+    term: 'LLM (Large Language Model)',
+    definition: 'LLM là mô hình ngôn ngữ quy mô lớn được huấn luyện trên lượng văn bản lớn để dự đoán và sinh chuỗi ngôn ngữ.',
+    capabilities: 'LLM thường được dùng để trả lời câu hỏi, tóm tắt, viết nội dung, trích xuất thông tin và hỗ trợ lập trình.',
+    distinction: 'LLM nền tảng chủ yếu thao tác trên ngôn ngữ; khả năng xử lý ảnh, âm thanh hoặc video cần thêm thành phần đa phương thức.'
+  },
+  {
+    aliases: ['rag', 'retrieval augmented generation', 'retrieval-augmented generation'],
+    term: 'RAG (Retrieval-Augmented Generation)',
+    definition: 'RAG là cách kết hợp bước truy xuất tài liệu liên quan với bước sinh câu trả lời của mô hình.',
+    capabilities: 'Hệ thống tìm các đoạn nguồn phù hợp, đưa chúng vào context rồi yêu cầu model trả lời dựa trên nguồn đó.',
+    distinction: 'RAG không tự bảo đảm câu trả lời đúng; chất lượng còn phụ thuộc truy xuất, cách ghép context, prompt và bước kiểm tra output.'
+  },
+  {
+    aliases: ['embedding', 'embeddings', 'vector embedding'],
+    term: 'Embedding',
+    definition: 'Embedding là biểu diễn dữ liệu như văn bản hoặc hình ảnh thành vector số để các nội dung gần nghĩa có thể nằm gần nhau trong không gian biểu diễn.',
+    capabilities: 'Embedding thường được dùng cho tìm kiếm ngữ nghĩa, gom cụm, gợi ý và truy xuất tài liệu cho RAG.',
+    distinction: 'Embedding không phải là câu trả lời cuối; nó là biểu diễn trung gian phục vụ so sánh và truy xuất.'
+  },
+  {
+    aliases: ['fine tuning', 'fine-tuning', 'finetuning'],
+    term: 'Fine-tuning',
+    definition: 'Fine-tuning là tiếp tục huấn luyện một mô hình đã có trên dữ liệu hoặc mục tiêu hẹp hơn để điều chỉnh hành vi cho tác vụ cụ thể.',
+    capabilities: 'Nó có thể giúp model học phong cách, định dạng hoặc mẫu tác vụ ổn định hơn khi prompt đơn thuần chưa đủ.',
+    distinction: 'Fine-tuning khác RAG: fine-tuning thay đổi tham số hoặc adapter của model, còn RAG đưa nguồn được truy xuất vào context lúc chạy.'
+  }
+];
+
 export function normalizeText(value) {
   return String(value ?? '')
     .replace(/đ/g, 'd')
@@ -25,6 +63,60 @@ export function normalizeText(value) {
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function queryContainsAlias(query, alias) {
+  const normalizedQuery = ` ${normalizeText(query)} `;
+  const normalizedAlias = normalizeText(alias);
+  return normalizedAlias && normalizedQuery.includes(` ${normalizedAlias} `);
+}
+
+export function requiresCurrentInformation(query) {
+  const normalized = normalizeText(query);
+  return [
+    /\b(hom nay|bay gio|hien tai|moi nhat|vua xay ra)\b/,
+    /\b(thoi tiet|gia co phieu|ty gia|lich thi dau|tin tuc)\b/,
+    /\b(today|now|current|latest|weather|stock price|exchange rate)\b/
+  ].some(pattern => pattern.test(normalized));
+}
+
+export function createGeneralKnowledgeAnswer(query) {
+  if (requiresCurrentInformation(query)) {
+    return {
+      found: false,
+      requiresCurrentInformation: true,
+      content: 'Câu hỏi này cần dữ liệu cập nhật theo thời gian thực. Chatbot hiện không có công cụ tra cứu trực tiếp nên mình không nên đoán.'
+    };
+  }
+
+  const entry = GENERAL_KNOWLEDGE_GLOSSARY.find(item =>
+    item.aliases.some(alias => queryContainsAlias(query, alias))
+  );
+  if (!entry) {
+    return {
+      found: false,
+      requiresCurrentInformation: false,
+      content: ''
+    };
+  }
+
+  return {
+    found: true,
+    topic: entry.term,
+    requiresCurrentInformation: false,
+    content: [
+      '**Kiến thức nền ngoài slide**',
+      `${entry.definition}`,
+      '',
+      `**${entry.term} có thể làm gì?**`,
+      entry.capabilities,
+      '',
+      '**Điểm cần phân biệt**',
+      entry.distinction,
+      '',
+      'ℹ️ Phần trên là kiến thức nền bổ sung, không phải trích dẫn từ slide đang mở.'
+    ].join('\n')
+  };
 }
 
 export function tokenize(value) {
@@ -61,13 +153,20 @@ function scoreText(query, title, content) {
   const contentTokens = new Set(tokenize(content));
 
   let weightedMatches = 0;
+  let distinctiveMatches = 0;
   for (const token of queryTokens) {
-    if (titleTokens.has(token)) weightedMatches += 2;
-    else if (contentTokens.has(token)) weightedMatches += 1;
+    if (titleTokens.has(token)) {
+      weightedMatches += 2;
+      if (token.length >= 5) distinctiveMatches += 1;
+    } else if (contentTokens.has(token)) {
+      weightedMatches += 1;
+      if (token.length >= 5) distinctiveMatches += 1;
+    }
   }
 
   const maximum = queryTokens.length * 2;
   let score = maximum ? weightedMatches / maximum : 0;
+  score += distinctiveMatches * 0.12;
   if (normalizedQuery.length >= 5 && normalizedContent.includes(normalizedQuery)) score += 0.65;
   if (normalizedQuery.length >= 5 && normalizedTitle.includes(normalizedQuery)) score += 0.8;
   return score;
@@ -161,6 +260,15 @@ export function extractCitations(responseText) {
   };
 }
 
+function stripLessonCitations(responseText) {
+  return String(responseText ?? '')
+    .replace(/\[\s*(?:trang|slide)\s+\d{1,3}\s*\]/gi, '')
+    .replace(/\[\s*T\d{2}-\d{3}\s*\]/gi, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function validateGroundedResponse(responseText, lesson, constraints = {}) {
   const text = String(responseText ?? '').trim();
   if (!text) return { isValid: false, reason: 'Phản hồi rỗng' };
@@ -212,6 +320,153 @@ export function validateGroundedResponse(responseText, lesson, constraints = {})
   }
 
   return { isValid: true, citations, overlap };
+}
+
+export function validateHybridResponse(responseText, lesson, constraints = {}) {
+  const text = String(responseText ?? '').trim();
+  if (!text) return { isValid: false, reason: 'Phản hồi rỗng' };
+
+  const generalLabel =
+    'kiến thức nền ngoài slide|kiến thức bổ sung ngoài slide|kiến thức nền bổ sung|kiến thức bổ sung|thông tin bổ sung|giải thích mở rộng';
+  const generalHeadingPattern = new RegExp(
+    `^[ \\t]*(?:#{1,6}[ \\t]+)?(?:\\*\\*)?[ \\t]*(?:${generalLabel})[ \\t]*(?::|—|-)?[ \\t]*(?:\\*\\*)?[ \\t]*$`,
+    'im'
+  );
+  const generalInlinePattern = new RegExp(
+    `^[ \\t]*(?:\\*\\*)?[ \\t]*(?:${generalLabel})[ \\t]*(?::|—|-)[ \\t]*(?:\\*\\*)?[ \\t]*`,
+    'i'
+  );
+  const generalLabelMatch =
+    text.match(generalHeadingPattern) ?? text.match(generalInlinePattern);
+  const limitHeadingPattern =
+    /^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*)?[ \t]*(?:giới hạn|lưu ý về giới hạn)[ \t]*(?::|—|-)?[ \t]*(?:\*\*)?[ \t]*$/im;
+  const limitLabelMatch = text.match(limitHeadingPattern);
+  const citations = extractCitations(text);
+  const courseHeadingPattern =
+    /^[ \t]*(?:#{1,6}[ \t]+)?(?:\*\*)?[ \t]*(?:trong bài giảng|theo bài giảng|theo slide)[ \t]*(?::|—|-)?[ \t]*(?:\*\*)?[ \t]*$/gim;
+
+  const downgradeToGeneralKnowledge = reason => {
+    const cleanedText = stripLessonCitations(text)
+      .replace(generalHeadingPattern, '')
+      .replace(generalInlinePattern, '')
+      .replace(courseHeadingPattern, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    if (tokenize(cleanedText).length < 3) {
+      return { isValid: false, reason };
+    }
+    return {
+      isValid: true,
+      citations: { pages: [], transcriptIds: [] },
+      hasGeneralKnowledge: true,
+      isLimited: false,
+      wasAutoLabeled: true,
+      reclassifiedAsGeneralKnowledge: true,
+      reclassifiedReason: reason,
+      normalizedText: `**Kiến thức nền ngoài slide**\n${cleanedText}`
+    };
+  };
+
+  if (citations.pages.length || citations.transcriptIds.length) {
+    const groundedSegment = generalLabelMatch
+      ? text.slice(0, generalLabelMatch.index).trim()
+      : text;
+    const groundedValidation = validateGroundedResponse(
+      groundedSegment,
+      lesson,
+      constraints
+    );
+    if (!groundedValidation.isValid) {
+      if (constraints.allowCitationDowngrade) {
+        return downgradeToGeneralKnowledge(groundedValidation.reason);
+      }
+      return groundedValidation;
+    }
+  }
+
+  if (
+    !citations.pages.length &&
+    !citations.transcriptIds.length &&
+    !generalLabelMatch &&
+    !limitLabelMatch
+  ) {
+    if (
+      constraints.allowUnlabeledGeneralKnowledge &&
+      tokenize(text).length >= 3
+    ) {
+      return {
+        isValid: true,
+        citations,
+        hasGeneralKnowledge: true,
+        isLimited: false,
+        wasAutoLabeled: true,
+        normalizedText: `**Kiến thức nền ngoài slide**\n${text}`
+      };
+    }
+    return {
+      isValid: false,
+      reason: 'Kiến thức ngoài slide chưa được gắn nhãn rõ'
+    };
+  }
+
+  let normalizedText = text;
+  if (generalLabelMatch) {
+    const generalSection = text.slice(
+      generalLabelMatch.index + generalLabelMatch[0].length
+    ).trim();
+    const generalCitations = extractCitations(generalSection);
+    if (
+      generalCitations.pages.length ||
+      generalCitations.transcriptIds.length
+    ) {
+      if (!constraints.allowCitationDowngrade) {
+        return {
+          isValid: false,
+          reason: 'Phần kiến thức nền ngoài slide không được gắn citation bài giảng'
+        };
+      }
+    }
+    const cleanedGeneralSection = stripLessonCitations(generalSection);
+    if (tokenize(cleanedGeneralSection).length < 3) {
+      return {
+        isValid: false,
+        reason: 'Phần kiến thức nền ngoài slide quá ngắn hoặc không có nội dung'
+      };
+    }
+    normalizedText = [
+      text.slice(0, generalLabelMatch.index),
+      '**Kiến thức nền ngoài slide**\n',
+      cleanedGeneralSection
+    ].join('').trim();
+  }
+
+  if (limitLabelMatch) {
+    const limitSection = text.slice(
+      limitLabelMatch.index + limitLabelMatch[0].length
+    ).trim();
+    if (tokenize(limitSection).length < 4) {
+      return {
+        isValid: false,
+        reason: 'Phần giới hạn quá ngắn hoặc không giải thích được lý do'
+      };
+    }
+  }
+
+  if (limitLabelMatch) {
+    normalizedText = normalizedText
+      .replace(limitHeadingPattern, '**Giới hạn**')
+      .trim();
+  }
+
+  return {
+    isValid: true,
+    citations: extractCitations(normalizedText),
+    hasGeneralKnowledge: Boolean(generalLabelMatch),
+    isLimited: Boolean(limitLabelMatch),
+    wasAutoLabeled: false,
+    reclassifiedAsGeneralKnowledge: false,
+    normalizedText
+  };
 }
 
 export function verifyCitationAndSnippet(lesson, citationPage, sourceSnippet = '') {
@@ -268,14 +523,34 @@ function shorten(value, maxLength = 220) {
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 1).trim()}…`;
 }
 
+function teachingExpansion(slide) {
+  const title = String(slide?.title ?? 'nội dung này').trim();
+  return {
+    note: slide?.teachingNote ||
+      `Nói cách khác, “${title}” cần được hiểu cùng điều kiện và hệ quả được nêu trong nguồn; không nên biến một nhận định có bối cảnh thành quy tắc đúng cho mọi trường hợp.`,
+    example: slide?.example ||
+      `Hãy thử áp dụng “${title}” vào một tình huống gần với bài của bạn: xác định đầu vào, quyết định cần đưa ra và hậu quả nếu hiểu sai, rồi đối chiếu lại với trang nguồn.`
+  };
+}
+
 export function createOfflineAnswer(lesson, query) {
   const context = buildRelevantContext(lesson, query);
   const bestSlide = context.slideMatches[0]?.slide;
   if (bestSlide) {
-    const sentence = extractBestPassage(bestSlide.content, query);
+    const passage = extractBestPassage(bestSlide.content, query);
+    const expansion = teachingExpansion(bestSlide);
     return {
       found: true,
-      content: `Theo nội dung bài giảng, ${sentence} [Trang ${bestSlide.page}]`,
+      content: [
+        '**Trả lời ngắn**',
+        `${passage} [Trang ${bestSlide.page}]`,
+        '',
+        '**Giải thích thêm**',
+        `${expansion.note} [Trang ${bestSlide.page}]`,
+        '',
+        '**Ví dụ minh họa (do hệ thống tạo)**',
+        expansion.example
+      ].join('\n'),
       citation: `Trang ${bestSlide.page}`,
       context
     };
@@ -285,7 +560,13 @@ export function createOfflineAnswer(lesson, query) {
   if (bestTranscript) {
     return {
       found: true,
-      content: `Theo transcript bài giảng, ${bestTranscript.text} [${bestTranscript.id}]`,
+      content: [
+        '**Trả lời ngắn**',
+        `${bestTranscript.text} [${bestTranscript.id}]`,
+        '',
+        '**Giải thích thêm**',
+        'Đoạn transcript trên là căn cứ trực tiếp. Khi áp dụng, hãy giữ nguyên điều kiện và kết luận của người giảng thay vì suy rộng thành một quy tắc tuyệt đối.'
+      ].join('\n'),
       citation: bestTranscript.id,
       context
     };
@@ -299,6 +580,56 @@ export function createOfflineAnswer(lesson, query) {
   };
 }
 
+export function createHybridOfflineAnswer(lesson, query) {
+  const generalAnswer = createGeneralKnowledgeAnswer(query);
+  const context = buildRelevantContext(lesson, query);
+  const bestSlide = context.slideMatches[0]?.slide;
+  const bestTranscript = context.transcriptMatches[0];
+
+  if (generalAnswer.found) {
+    const courseSection = bestSlide
+      ? [
+          '**Trong bài giảng**',
+          `${extractBestPassage(bestSlide.content, query)} [Trang ${bestSlide.page}]`,
+          '',
+          'Slide đang dùng thuật ngữ này nhưng phần định nghĩa dưới đây là kiến thức nền bổ sung.'
+        ].join('\n')
+      : bestTranscript
+        ? [
+            '**Trong bài giảng**',
+            `${bestTranscript.text} [${bestTranscript.id}]`,
+            '',
+            'Transcript có nhắc tới thuật ngữ; phần định nghĩa dưới đây là kiến thức nền bổ sung.'
+          ].join('\n')
+        : '';
+
+    return {
+      found: true,
+      sourceType: courseSection ? 'hybrid' : 'general_knowledge',
+      content: [courseSection, generalAnswer.content].filter(Boolean).join('\n\n'),
+      citation: bestSlide
+        ? `Trang ${bestSlide.page}`
+        : bestTranscript?.id ?? null,
+      context
+    };
+  }
+
+  const groundedAnswer = createOfflineAnswer(lesson, query);
+  if (groundedAnswer.found) return groundedAnswer;
+
+  return {
+    found: false,
+    sourceType: generalAnswer.requiresCurrentInformation
+      ? 'requires_current_information'
+      : 'unknown',
+    content: generalAnswer.requiresCurrentInformation
+      ? generalAnswer.content
+      : 'Nội dung này không có trong slide và fallback offline chưa có kiến thức nền tương ứng. Hãy nhập Gemini API Key để model giải thích kiến thức ngoài slide; hệ thống sẽ gắn nhãn rõ và không tạo citation giả.',
+    citation: null,
+    context
+  };
+}
+
 export function createOfflineExplanation(slide, selectedText) {
   const selected = String(selectedText ?? '').trim();
   const source = String(slide?.content ?? '').trim();
@@ -307,10 +638,16 @@ export function createOfflineExplanation(slide, selectedText) {
   }
 
   const sentence = extractBestSentence(source, selected);
+  const expansion = teachingExpansion(slide);
   return [
-    `Đoạn bạn chọn nói về: “${shorten(selected, 180)}”.`,
-    `Ngữ cảnh trực tiếp trên slide: ${shorten(sentence, 260)}.`,
-    `Mình chỉ diễn giải từ nội dung đang hiển thị, không bổ sung kiến thức ngoài tài liệu. [Trang ${slide.page}]`
+    '**Đoạn đang nói gì?**',
+    `“${shorten(selected, 180)}” nằm trong ngữ cảnh: ${shorten(sentence, 260)}. [Trang ${slide.page}]`,
+    '',
+    '**Giải thích thêm**',
+    `${expansion.note} [Trang ${slide.page}]`,
+    '',
+    '**Ví dụ minh họa (do hệ thống tạo)**',
+    expansion.example
   ].join('\n');
 }
 
@@ -348,24 +685,36 @@ export function createOfflineSummary(lesson) {
   };
 }
 
-function deterministicOptions(correctText, distractorTexts, rotation) {
-  const fallbackDistractors = [
-    'Tài liệu không đưa ra nhận định này ở trang được hỏi.',
-    'Nội dung này thuộc một chủ đề khác và không mô tả khái niệm trên.',
-    'Trang được hỏi không cung cấp dữ liệu để kết luận như vậy.'
+function mutateRelationship(text) {
+  const replacements = [
+    [/\bcao\b/i, 'thấp'],
+    [/\bthấp\b/i, 'cao'],
+    [/\btăng\b/i, 'giảm'],
+    [/\bgiảm\b/i, 'tăng'],
+    [/\bnhiều\b/i, 'ít'],
+    [/\bít\b/i, 'nhiều'],
+    [/\bđắt\b/i, 'rẻ'],
+    [/\brẻ\b/i, 'đắt'],
+    [/\btrước\b/i, 'sau'],
+    [/\bđúng\b/i, 'sai']
   ];
-  const uniqueDistractors = [...new Set(
-    distractorTexts
-      .map(text => shorten(text, 180))
-      .filter(text => text && text !== correctText)
-  )];
-  while (uniqueDistractors.length < 3) {
-    uniqueDistractors.push(fallbackDistractors[uniqueDistractors.length]);
+  for (const [pattern, replacement] of replacements) {
+    if (pattern.test(text)) return text.replace(pattern, replacement);
   }
+  return `Có thể đảo ngược quan hệ điều kiện–hệ quả của nhận định “${shorten(text, 120)}” mà kết luận vẫn giữ nguyên.`;
+}
 
-  const values = uniqueDistractors.slice(0, 3);
+function conceptualOptions(slide, correctText, rotation) {
+  const title = shorten(slide.title || `Trang ${slide.page}`, 80);
+  const correct = shorten(correctText, 180);
+  const distractors = [
+    shorten(mutateRelationship(correct), 180),
+    shorten(`“${title}” chỉ là quy tắc về cách trình bày; bối cảnh và hậu quả không ảnh hưởng tới kết luận.`, 180),
+    shorten(`Có thể áp dụng “${title}” như một quy tắc tuyệt đối mà không cần kiểm tra điều kiện ở Trang ${slide.page}.`, 180)
+  ];
+  const values = distractors;
   const correctIndex = rotation % 4;
-  values.splice(correctIndex, 0, shorten(correctText, 180));
+  values.splice(correctIndex, 0, correct);
   const keys = ['A', 'B', 'C', 'D'];
   return {
     options: Object.fromEntries(keys.map((key, index) => [key, values[index]])),
@@ -403,22 +752,25 @@ function buildRubricPoints(slide) {
 export function createOfflineQuiz(lesson) {
   const informativeSlides = (lesson?.slides ?? []).filter(slide => tokenize(slide.content).length >= 5);
   const selectedSlides = informativeSlides.slice(0, 7);
-  const sourceSentences = selectedSlides.map(slide => extractBestSentence(slide.content));
-
-  const mcqQuestions = selectedSlides.map((slide, index) => {
-    const sourceSnippet = sourceSentences[index];
-    const distractors = sourceSentences.filter((_, sourceIndex) => sourceIndex !== index);
-    const optionSet = deterministicOptions(sourceSnippet, distractors, index);
-    return {
-      id: index + 1,
-      source_snippet: sourceSnippet,
-      question: `Theo bài giảng, nhận định nào mô tả đúng “${slide.title}”?`,
-      options: optionSet.options,
-      correct_option: optionSet.correctOption,
-      explanation: `Đáp án được trích trực tiếp từ nội dung của Trang ${slide.page}.`,
-      citation: `Trang ${slide.page}`
-    };
-  });
+  const seededQuestions = Array.isArray(lesson?.quizSeeds) ? lesson.quizSeeds : [];
+  const mcqQuestions = seededQuestions.length
+    ? seededQuestions.map(question => ({
+        ...question,
+        options: { ...question.options }
+      }))
+    : selectedSlides.map((slide, index) => {
+        const sourceSnippet = extractBestSentence(slide.content);
+        const optionSet = conceptualOptions(slide, sourceSnippet, index);
+        return {
+          id: index + 1,
+          source_snippet: sourceSnippet,
+          question: `Tình huống nào áp dụng đúng ý chính của “${slide.title}”?`,
+          options: optionSet.options,
+          correct_option: optionSet.correctOption,
+          explanation: `Đáp án giữ đúng quan hệ điều kiện–kết quả được nêu ở Trang ${slide.page}; các lựa chọn còn lại đảo quan hệ, thu hẹp sai phạm vi hoặc tuyệt đối hóa kết luận.`,
+          citation: `Trang ${slide.page}`
+        };
+      });
 
   const essaySource = selectedSlides[0];
   const rubricPoints = essaySource ? buildRubricPoints(essaySource) : [];
@@ -437,7 +789,7 @@ export function createOfflineQuiz(lesson) {
     mcq_questions: mcqQuestions,
     essay_questions: essayQuestions,
     is_fallback: true,
-    warning: selectedSlides.length < 7
+    warning: !seededQuestions.length && selectedSlides.length < 7
       ? `Tài liệu chỉ có ${selectedSlides.length} trang đủ text; hệ thống tạo ít câu hơn để tránh bịa nội dung.`
       : ''
   };
@@ -457,10 +809,15 @@ function normalizeQuestion(rawQuestion, lesson, type) {
   if (type === 'mcq') {
     const options = rawQuestion.options;
     const correctOption = String(rawQuestion.correct_option ?? '').toUpperCase();
+    const optionValues = options
+      ? ['A', 'B', 'C', 'D'].map(key => String(options[key] ?? '').trim())
+      : [];
+    const uniqueOptionValues = new Set(optionValues.map(normalizeText));
     if (
       !rawQuestion.question ||
       !options ||
       !['A', 'B', 'C', 'D'].every(key => typeof options[key] === 'string' && options[key].trim()) ||
+      uniqueOptionValues.size !== 4 ||
       !['A', 'B', 'C', 'D'].includes(correctOption)
     ) {
       return null;
@@ -501,15 +858,47 @@ function normalizeQuestion(rawQuestion, lesson, type) {
   };
 }
 
+function optionSimilarity(first, second) {
+  const firstTokens = new Set(tokenize(first));
+  const secondTokens = new Set(tokenize(second));
+  if (!firstTokens.size || !secondTokens.size) return 0;
+  const intersection = [...firstTokens].filter(token => secondTokens.has(token)).length;
+  const union = new Set([...firstTokens, ...secondTokens]).size;
+  return intersection / union;
+}
+
+function hasCrossQuestionOptionLeak(question, seenOptions) {
+  return Object.values(question.options).some(option => {
+    const normalized = normalizeText(option);
+    return seenOptions.some(seen => {
+      if (normalized === seen.normalized) return true;
+      const minimumTokens = Math.min(tokenize(option).length, seen.tokens);
+      return minimumTokens >= 6 && optionSimilarity(option, seen.text) >= 0.88;
+    });
+  });
+}
+
 export function validateQuizData(rawQuiz, lesson) {
   if (!rawQuiz || typeof rawQuiz !== 'object') {
     return { lesson_title: lesson?.title ?? 'Bài học', mcq_questions: [], essay_questions: [] };
   }
 
-  const mcqQuestions = (Array.isArray(rawQuiz.mcq_questions) ? rawQuiz.mcq_questions : [])
+  const normalizedCandidates = (Array.isArray(rawQuiz.mcq_questions) ? rawQuiz.mcq_questions : [])
     .map(question => normalizeQuestion(question, lesson, 'mcq'))
     .filter(Boolean)
     .slice(0, 8);
+  const seenOptions = [];
+  const mcqQuestions = normalizedCandidates.filter(question => {
+    if (hasCrossQuestionOptionLeak(question, seenOptions)) return false;
+    for (const option of Object.values(question.options)) {
+      seenOptions.push({
+        text: option,
+        normalized: normalizeText(option),
+        tokens: tokenize(option).length
+      });
+    }
+    return true;
+  });
   const essayQuestions = (Array.isArray(rawQuiz.essay_questions) ? rawQuiz.essay_questions : [])
     .map(question => normalizeQuestion(question, lesson, 'essay'))
     .filter(Boolean)

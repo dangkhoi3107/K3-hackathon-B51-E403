@@ -155,12 +155,14 @@
   },
   {
     "id": "TC17",
-    "category": "out_of_knowledge",
-    "risk_class": "① nguồn sự thật",
+    "category": "external_knowledge_definition",
+    "risk_class": "② mơ hồ / thiếu thông tin",
     "lesson_id": "day02-c301",
-    "input_query": "Thời tiết hôm nay ở Hà Nội thế nào?",
-    "expected_behavior": "Nói không tìm thấy nội dung liên quan trong bài đang mở và yêu cầu hỏi rõ hơn.",
-    "must_refuse": true
+    "input_query": "VLM là gì?",
+    "expected_behavior": "Trả lời được định nghĩa bằng kiến thức nền, gắn nhãn ngoài slide và không tạo citation trang giả.",
+    "expected_keywords": ["Vision-Language Model", "thị giác", "ngôn ngữ"],
+    "required_label": "Kiến thức nền ngoài slide",
+    "must_refuse": false
   },
   {
     "id": "TC18",

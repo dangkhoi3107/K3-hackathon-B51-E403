@@ -37,8 +37,8 @@
                                         └────────────┬─────────────┘
                                                      ▼
                                         ┌──────────────────────────┐
-                                        │ LLM Core Engine          │
-                                        │ (Gemini 3.1 Flash/Lite)  │
+                                        │ Provider Adapter         │
+                                        │ OpenRouter / Gemini      │
                                         └────────────┬─────────────┘
                                                      ▼
                                         ┌──────────────────────────┐
@@ -78,18 +78,18 @@
 3. **Bộ Tool Chuyên Hóa & Tầng Resilience (Specialized Agent Tools & Resilience Layer)**:
    - **Tool 1: `explain_region_tool`**: Nhận `selected_text` + `page_num` $\rightarrow$ truy vấn ngữ cảnh trang $\rightarrow$ giải thích cô đọng 2-3 câu kèm trích dẫn `[trang N]`.
    - **Tool 2: `summarize_deck_tool`**: Đọc toàn bộ nội dung slide/transcript $\rightarrow$ trích xuất 5 Key Takeaways + Bản đồ khái niệm cốt lõi (Concept Map) + Trích dẫn trang quan trọng.
-   - **Tool 3: `qa_grounded_tool`**: Tra cứu chính xác từ `transcript/` và `slides/` $\rightarrow$ Trả lời thắc mắc của học viên, bắt buộc kèm trích dẫn `[trang N]`. **Tầng Guardrail An Toàn:** Tích hợp bộ lọc Output Guard kiểm tra intent vượt thẩm quyền (như đòi giải hộ bài lab/quiz nộp điểm) ở cấp độ mã code trước khi trả về UI, không chỉ phụ thuộc vào System Prompt tự giác.
+   - **Tool 3: `qa_grounded_tool` (Broad Hybrid Knowledge Mode)**: Dùng `transcript/` và `slides/` làm điểm xuất phát nhưng cho phép model giải thích rộng bằng kiến thức nền, so sánh, ứng dụng và ví dụ. Citation hợp lệ được giữ; citation sai bị gỡ và nội dung được tự phân loại thành **“Kiến thức nền ngoài slide”** thay vì loại toàn bộ phản hồi. **Tầng Guardrail An Toàn:** Input Guard vẫn chặn yêu cầu làm hộ bài nộp, prompt injection và hành vi nguy hiểm.
    - **Tool 4: `quiz_generator_tool` (Quy trình 2 bước Chống Bịa Kiến Thức - Extract-then-Generate)**:
      - **Bước 1 — Extract (Trích xuất trước):** Model chỉ được phép trích xuất nguyên văn (hoặc gần nguyên văn) các đoạn/khái niệm/công thức/số liệu CÓ THẬT từ slide+transcript của `day_code` đó, kèm `page_num` nguồn — KHÔNG được diễn giải hay tổng hợp ở bước này.
      - **Bước 2 — Generate (Sinh câu hỏi từ trích xuất):** Model chỉ dùng các đoạn đã trích xuất ở Bước 1 làm nguyên liệu để soạn câu hỏi, đáp án, giải thích. Mọi câu hỏi PHẢI map ngược được về đúng 1 đoạn `source_snippet` trích xuất cụ thể — nếu không map được về đoạn nào, loại câu hỏi đó khỏi bộ quiz thay vì giữ lại.
-     - **Tầng Resilience (Xử lý sự cố API):** Tích hợp retry tự động 2 lần (exponential backoff) khi gặp lỗi Gemini API timeout. Nếu retry vẫn thất bại, hệ thống tự động fallback về tập Quiz rút gọn (các câu đã sinh thành công) kèm thông báo UI: *"Hệ thống đã khởi tạo trước N câu hỏi ôn tập do kết nối mạng chập chờn"*.
+     - **Tầng Resilience (Xử lý sự cố API):** Adapter hỗ trợ OpenRouter/Gemini, retry tự động 2 lần với timeout/429/5xx; lỗi key/quyền 4xx dừng ngay. Nếu vẫn thất bại, hệ thống tự động fallback về tập Quiz rút gọn.
    - **Tool 5: `quiz_evaluator_tool`**: Đánh giá câu trả lời tự luận của học viên dựa trên Rubric có phân bổ trọng số (weighted rubric) $\rightarrow$ chấm điểm (PASSED / PASSED_WITH_FEEDBACK / FAILED) + chỉ rõ ý còn thiếu kèm `[trang N]` trong slide.
 
 4. **Context Assembler Layer (Thay thế RAG cho bài toán 1 buổi học)**:
    - Vì phạm vi dữ liệu hiện tại là 1 buổi học (vài chục trang slide + transcript), không dùng embedding vector DB rườm rà.
    - **Cơ chế nạp ngữ cảnh:** 
      - Với `explain_region_tool`: Truy vấn lọc trực tiếp theo `page_num` (Structured Lookup).
-     - Với `summarize_deck_tool`, `qa_grounded_tool`, `quiz_generator_tool`: Load toàn bộ văn bản Slide + Transcript sạch của `day_code` trực tiếp vào Context Window 1M token của Gemini 3.1 Flash-Lite / Gemini 3 Flash.
+     - Với `summarize_deck_tool`, `qa_grounded_tool`, `quiz_generator_tool`: Load văn bản Slide + Transcript sạch của `day_code` vào context của model đang chọn qua Provider Adapter.
    - *Lưu ý nâng cấp:* Nếu sản phẩm mở rộng scale lên toàn bộ khóa học nhiều buổi học (Multi-session Catalog), mô-đun Vector Search / Embedding Database sẽ được cắm vào tầng này mà không làm thay đổi luồng xử lý của các Tool bên trên.
 
 5. **Tầng Kiểm Tra Trích Dẫn & Source Snippet Validation 2 Bước (Verification Guard)**:
@@ -112,9 +112,9 @@
 * **Output:** 3 Mục tiêu bài học cốt lõi + 5 Key Takeaways + Bản đồ trang slide quan trọng.
 
 ### 📌 Tính năng 3: Hỏi đáp Trả lời Thắc mắc (Grounded Q&A Tutor + Guardrail)
-* **Mục tiêu:** Giải đáp mọi câu hỏi thắc mắc của học viên nhưng không bịa đặt kiến thức và chống prompt injection.
+* **Mục tiêu:** Giải đáp câu hỏi từ bài giảng có trích dẫn, đồng thời cung cấp kiến thức nền cần thiết để hiểu thuật ngữ slide chưa định nghĩa; hai lớp thông tin phải được phân tách rõ và chống prompt injection.
 * **Input:** Câu hỏi tự do của học viên.
-* **Output:** Câu trả lời trực diện kèm trích dẫn verified `[trang N]`. Nếu vượt thẩm quyền hoặc đòi giải hộ bài lab nộp điểm $\rightarrow$ Guardrail chặn lại và trả lời: *"Mình chỉ hỗ trợ kiểm tra kiến thức tự luyện. Bạn hãy tự làm bài quiz/lab nộp điểm nhé!"*
+* **Output:** Câu trả lời tự nhiên 2-5 đoạn, ưu tiên giải thích bằng lời của model và ví dụ cụ thể. Khi có nội dung từ bài giảng, citation verified được giữ; phần mở rộng được UI tự gắn nhãn và không mang citation trang. Nếu vượt thẩm quyền hoặc đòi giải hộ bài lab nộp điểm $\rightarrow$ Guardrail chặn lại.
 
 ### 📌 Tính năng 4 (TÍNH NĂNG MỚI NÒNG CỐT): Kiểm Tra Hiểu Thật Cuối Buổi (End-of-Session Quiz Agent)
 * **Mục tiêu:** Đánh giá chính xác mức độ nắm bài của học viên ngay khi vừa học xong dựa trên nguyên tắc **Extract-then-Generate**.
@@ -264,7 +264,7 @@ Thử nghiệm prototype trực tiếp với $\ge 3$ học viên thật trong l�
 **Giải pháp khắc phục:**
 1. **Dựng Web Prototype Độc Lập (Standalone App - Khuyên dùng):**
    - Xây dựng một giao diện Web HTML/JS (`src/index.html` + `src/app.js`) mô phỏng 100% màn hình học tập của VLearn.
-   - Nhóm tự tích hợp Agent Core Controller & Prompt Router (`src/prompts.js`) chạy bằng API Key **Gemini 3.1 Flash / Gemini 3 Flash** cấp qua Google AI Studio.
+   - Nhóm tự tích hợp Agent Core Controller & Prompt Router (`src/prompts.js`) qua `src/providers.mjs`, hỗ trợ API Key **OpenRouter hoặc Gemini** và model do người dùng chọn.
    - Sử dụng bộ dữ liệu slide PDF & transcript sạch trong `data/vlearn-pack/` làm tài liệu bối cảnh.
 2. **Tùy chọn nâng cao (Chrome Extension Injection - Nếu kịp):**
    - Viết một Chrome Extension nhỏ inject nút *"Kiểm tra hiểu thật"* trực tiếp vào trang VLearn thật, khi bấm sẽ mở Widget Sidebar kết nối tới API Agent riêng của nhóm.

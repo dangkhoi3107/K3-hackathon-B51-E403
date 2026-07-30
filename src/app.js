@@ -8,18 +8,25 @@ import {
 } from './prompts.js';
 import {
   buildRelevantContext,
-  createOfflineAnswer,
   createOfflineExplanation,
+  createHybridOfflineAnswer,
   createOfflineQuiz,
   createOfflineSummary,
   detectGuardrailViolation,
   evaluateEssayLocally,
   normalizeLiveEvaluation,
   validateGroundedResponse,
+  validateHybridResponse,
   validateQuizData
 } from './grounding.mjs';
+import {
+  AI_PROVIDERS,
+  buildProviderRequest,
+  getProviderConfig,
+  isRetryableProviderStatus,
+  parseProviderResponse
+} from './providers.mjs';
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
 const MAX_PDF_PAGES = 50;
 const API_TIMEOUT_MS = 20_000;
 const API_RETRY_DELAYS_MS = [0, 450, 1_100];
@@ -31,8 +38,18 @@ let currentQuizData = null;
 let pdfRenderTask = null;
 let pdfRenderSequence = 0;
 let resizeTimer = null;
+const providerCredentials = {
+  openrouter: '',
+  gemini: ''
+};
+const providerModels = {
+  openrouter: AI_PROVIDERS.openrouter.defaultModel,
+  gemini: AI_PROVIDERS.gemini.defaultModel
+};
 
 const lessonSelect = document.getElementById('lessonSelect');
+const providerSelect = document.getElementById('providerSelect');
+const modelInput = document.getElementById('modelInput');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const agentModeBadge = document.getElementById('agentModeBadge');
 const agentModeText = document.getElementById('agentModeText');
@@ -77,7 +94,7 @@ function initApp() {
   populateLessonSelector();
   setupEventListeners();
   setupUploadHandlers();
-  setAgentMode('offline', 'Demo có căn cứ');
+  syncProviderControls();
   renderCurrentSlide();
 }
 
@@ -252,11 +269,15 @@ function setupEventListeners() {
   });
   btnGenerateQuiz.addEventListener('click', handleGenerateQuiz);
 
+  providerSelect.addEventListener('change', syncProviderControls);
+  modelInput.addEventListener('input', () => {
+    providerModels[activeProviderId()] =
+      modelInput.value.trim() || activeProvider().defaultModel;
+    updateProviderReadiness();
+  });
   apiKeyInput.addEventListener('input', () => {
-    setAgentMode(
-      apiKeyInput.value.trim() ? 'ready' : 'offline',
-      apiKeyInput.value.trim() ? 'Gemini sẵn sàng' : 'Demo có căn cứ'
-    );
+    providerCredentials[activeProviderId()] = apiKeyInput.value.trim();
+    updateProviderReadiness();
   });
 
   document.addEventListener('click', event => {
@@ -581,16 +602,55 @@ function setAgentMode(mode, text) {
   agentModeText.textContent = text;
 }
 
+function activeProviderId() {
+  return providerSelect.value === 'gemini' ? 'gemini' : 'openrouter';
+}
+
+function activeProvider() {
+  return getProviderConfig(activeProviderId());
+}
+
+function updateProviderReadiness() {
+  const provider = activeProvider();
+  const hasKey = Boolean(providerCredentials[provider.id]);
+  setAgentMode(
+    hasKey ? 'ready' : 'offline',
+    hasKey ? `${provider.label} sẵn sàng` : `${provider.label} · offline`
+  );
+}
+
+function syncProviderControls() {
+  const provider = activeProvider();
+  modelInput.value = providerModels[provider.id] || provider.defaultModel;
+  modelInput.placeholder = provider.defaultModel;
+  apiKeyInput.value = providerCredentials[provider.id] || '';
+  apiKeyInput.placeholder = provider.keyPlaceholder;
+  updateProviderReadiness();
+}
+
 function delay(milliseconds) {
   return new Promise(resolve => window.setTimeout(resolve, milliseconds));
 }
 
-async function callLLMAPI(promptText, { json = false } = {}) {
-  const apiKey = apiKeyInput.value.trim();
+async function callLLMAPI(promptText, { json = false, temperature } = {}) {
+  const provider = activeProvider();
+  const apiKey = providerCredentials[provider.id];
   if (!apiKey) {
-    setAgentMode('offline', 'Demo có căn cứ');
+    setAgentMode('offline', `${provider.label} · offline`);
     return null;
   }
+
+  const model = modelInput.value.trim() || provider.defaultModel;
+  providerModels[provider.id] = model;
+  const request = buildProviderRequest({
+    providerId: provider.id,
+    apiKey,
+    model,
+    promptText,
+    json,
+    temperature,
+    origin: window.location.origin
+  });
 
   for (let attempt = 0; attempt < API_RETRY_DELAYS_MS.length; attempt += 1) {
     if (API_RETRY_DELAYS_MS[attempt]) await delay(API_RETRY_DELAYS_MS[attempt]);
@@ -598,41 +658,32 @@ async function callLLMAPI(promptText, { json = false } = {}) {
     const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: {
-              temperature: json ? 0.1 : 0.2,
-              ...(json ? { responseMimeType: 'application/json' } : {})
-            }
-          })
-        }
-      );
+      const response = await fetch(request.url, {
+        ...request.options,
+        signal: controller.signal
+      });
       if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}));
         const message = errorPayload?.error?.message || `HTTP ${response.status}`;
-        throw new Error(message);
+        const providerError = new Error(message);
+        providerError.status = response.status;
+        throw providerError;
       }
       const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts
-        ?.map(part => part.text ?? '')
-        .join('')
-        .trim();
-      if (!text) throw new Error('Gemini không trả về nội dung');
-      setAgentMode('live', 'Gemini live');
+      const text = parseProviderResponse(provider.id, data);
+      if (!text) throw new Error(`${provider.label} không trả về nội dung`);
+      setAgentMode('live', `${provider.label} live · ${model}`);
       return text;
     } catch (error) {
-      console.warn(`Gemini attempt ${attempt + 1} failed:`, error);
-      if (attempt === API_RETRY_DELAYS_MS.length - 1) {
-        setAgentMode('error', 'Dự phòng có căn cứ');
+      console.warn(`${provider.label} attempt ${attempt + 1} failed:`, error);
+      const retryable =
+        error?.name === 'AbortError' ||
+        isRetryableProviderStatus(error?.status);
+      const isLastAttempt = attempt === API_RETRY_DELAYS_MS.length - 1;
+      if (!retryable || isLastAttempt) {
+        const status = error?.status ? ` ${error.status}` : '';
+        setAgentMode('error', `${provider.label} lỗi${status} · fallback`);
+        break;
       }
     } finally {
       window.clearTimeout(timeoutId);
@@ -736,27 +787,31 @@ async function handleUserChat() {
 
   const lesson = currentLesson();
   const relevantContext = buildRelevantContext(lesson, query);
-  const offlineAnswer = createOfflineAnswer(lesson, query);
-  if (!offlineAnswer.found) {
-    appendMessage('bot', offlineAnswer.content);
-    return;
-  }
-
-  const prompt = buildQAGroundedPrompt(relevantContext.text, query);
-  const llmResponse = await callLLMAPI(prompt);
+  const fallbackAnswer = createHybridOfflineAnswer(lesson, query);
+  const hasLessonContext =
+    relevantContext.allowedPages.length > 0 ||
+    relevantContext.allowedTranscriptIds.length > 0;
+  const prompt = buildQAGroundedPrompt(
+    relevantContext.text,
+    query,
+    hasLessonContext
+  );
+  const llmResponse = await callLLMAPI(prompt, { temperature: 0.55 });
   if (llmResponse) {
-    const verification = validateGroundedResponse(llmResponse, lesson, {
+    const verification = validateHybridResponse(llmResponse, lesson, {
       allowedPages: relevantContext.allowedPages,
-      allowedTranscriptIds: relevantContext.allowedTranscriptIds
+      allowedTranscriptIds: relevantContext.allowedTranscriptIds,
+      allowUnlabeledGeneralKnowledge: true,
+      allowCitationDowngrade: true
     });
     if (verification.isValid) {
-      appendMessage('bot', llmResponse);
+      appendMessage('bot', verification.normalizedText ?? llmResponse);
       return;
     }
     console.warn('Rejected ungrounded Q&A response:', verification.reason);
   }
 
-  appendMessage('bot', offlineAnswer.content);
+  appendMessage('bot', fallbackAnswer.content);
 }
 
 async function handleGenerateQuiz() {
@@ -784,11 +839,12 @@ async function handleGenerateQuiz() {
     if (llmResponse) {
       const rawQuiz = parseJSONObject(llmResponse);
       const verifiedQuiz = validateQuizData(rawQuiz, lesson);
-      if (verifiedQuiz.mcq_questions.length || verifiedQuiz.essay_questions.length) {
+      const minimumUsefulMCQ = Math.min(3, offlineQuiz.mcq_questions.length);
+      if (verifiedQuiz.mcq_questions.length >= minimumUsefulMCQ) {
         selectedQuiz = verifiedQuiz;
       } else {
         rejectionWarning =
-          'Các câu AI sinh không khớp source_snippet/trang nguồn nên đã bị loại; đang dùng bộ câu hỏi trích xuất cục bộ.';
+          'Bộ câu AI sinh có quá ít câu đạt chuẩn nguồn/độ đa dạng sau khi loại option trùng; đang dùng bộ câu hỏi đã kiểm chứng cục bộ.';
       }
     }
 
@@ -810,7 +866,7 @@ function renderQuizUI(quizObject) {
   const questionCount =
     verifiedQuiz.mcq_questions.length + verifiedQuiz.essay_questions.length;
   quizScopeText.textContent = questionCount
-    ? `${verifiedQuiz.mcq_questions.length} trắc nghiệm + ${verifiedQuiz.essay_questions.length} tự luận · đã kiểm tra nguồn`
+    ? `${verifiedQuiz.mcq_questions.length} trắc nghiệm + ${verifiedQuiz.essay_questions.length} tự luận · option không lặp · nguồn mở sau khi trả lời`
     : 'Không có đủ text để tạo câu hỏi có căn cứ';
 
   if (verifiedQuiz.warning) {
@@ -835,7 +891,7 @@ function renderQuizUI(quizObject) {
     card.innerHTML = `
       <div class="quiz-card-header">
         <span class="quiz-type-tag">Câu ${index + 1} — Trắc nghiệm</span>
-        ${citationButtonHTML(question.citation)}
+        <span class="quiz-source-locked">🔒 Nguồn mở sau khi trả lời</span>
       </div>
       <div class="quiz-question-text">${escapeHTML(question.question)}</div>
       <div class="mcq-options">
@@ -858,7 +914,7 @@ function renderQuizUI(quizObject) {
     card.innerHTML = `
       <div class="quiz-card-header">
         <span class="quiz-type-tag" style="background:rgba(6,182,212,0.2); color:#22d3ee;">Câu tự luận</span>
-        ${citationButtonHTML(question.citation)}
+        <span class="quiz-source-locked">🔒 Nguồn mở sau khi chấm</span>
       </div>
       <div class="quiz-question-text">${escapeHTML(question.question)}</div>
       <div class="essay-input-area">
@@ -878,13 +934,6 @@ function renderQuizUI(quizObject) {
       handleEvaluateEssay(question, answer);
     });
   });
-}
-
-function citationButtonHTML(citation) {
-  const page = String(citation).match(/(\d{1,3})/)?.[1];
-  return page
-    ? `<button type="button" class="citation-tag" data-citation-page="${page}">📌 ${escapeHTML(citation)}</button>`
-    : `<span class="citation-tag">📌 ${escapeHTML(citation)}</span>`;
 }
 
 function handleMCQAnswer(button, quizObject) {
