@@ -123,6 +123,91 @@ export function buildQuizGeneratorPrompt(lessonTitle, lessonContext) {
   ].join("\n");
 }
 
+export function buildAdaptiveQuestionPrompt(slideContext, difficultyLabel, avoidQuestions = [], interestNote = "") {
+  const avoidBlock = avoidQuestions.length
+    ? "Các câu ĐÃ hỏi trong phiên này, KHÔNG lặp lại ý tương tự:\n" +
+      avoidQuestions.map(q => "- " + q).join("\n") + "\n\n"
+    : "";
+  const interestBlock = interestNote
+    ? "Học viên trước đó từng chủ động hỏi/khoanh vùng liên quan tới nội dung này:\n" +
+      interestNote + "\n" +
+      "Nếu phù hợp với ngữ cảnh trang, ưu tiên ra câu hỏi kiểm tra đúng điểm học viên đã quan tâm/thắc mắc. " +
+      "Nếu không liên quan tới trang đang xét thì bỏ qua, không gượng ép.\n\n"
+    : "";
+  return [
+    "Bạn là AI Quiz Generator của VLearn, đang chạy chế độ TỰ KIỂM TRA THÍCH ỨNG (adaptive):",
+    "sinh TỪNG CÂU HỎI MỘT cho MỘT trang slide, không sinh cả bộ.",
+    "",
+    "QUY TRÌNH 2 BƯỚC BẮT BUỘC (EXTRACT-THEN-GENERATE):",
+    "- Bước 1 (Extract): Trích xuất nguyên văn đoạn thông tin CÓ THẬT từ ngữ cảnh bên dưới kèm trang nguồn.",
+    "- Bước 2 (Generate): Chỉ dùng đoạn trích xuất ở Bước 1 để soạn DUY NHẤT 1 câu hỏi trắc nghiệm 4 đáp án.",
+    "- citation phải là đúng trang chứa source_snippet trong ngữ cảnh; không dùng trang khác.",
+    "",
+    "PHÂN LOẠI 3 ĐÁP ÁN SAI (distractor_tiers) - BẮT BUỘC:",
+    "- 'near': ngộ nhận GẦN ĐÚNG - học viên hiểu một phần, nhầm lẫn một điểm cụ thể (đảo điều kiện-kết quả, nhầm khái niệm gần nhau, thiếu 1 ý).",
+    "- 'far': SAI HẲN - không liên quan hoặc ngược hoàn toàn với nội dung đúng.",
+    "- Trong 3 đáp án sai, có ít nhất 1 'near' và ít nhất 1 'far' (không được để cả 3 cùng loại).",
+    "",
+    "Mức độ cần hỏi: " + difficultyLabel + ".",
+    avoidBlock,
+    interestBlock,
+    "Ngữ cảnh (nguồn DUY NHẤT được dùng, chỉ 1 trang):",
+    slideContext,
+    "",
+    "BẮT BUỘC trả về JSON đúng schema sau (không thêm markdown, không bọc mảng):",
+    JSON.stringify({
+      id: 1,
+      source_snippet: "<đoạn trích nguyên văn từ ngữ cảnh>",
+      question: "<nội dung câu hỏi>",
+      options: { A: "<Lựa chọn A>", B: "<Lựa chọn B>", C: "<Lựa chọn C>", D: "<Lựa chọn D>" },
+      correct_option: "A/B/C/D",
+      distractor_tiers: { A: "near hoặc far (bỏ qua nếu là correct_option)", B: "near hoặc far", C: "near hoặc far", D: "near hoặc far" },
+      explanation: "<Giải thích ngắn>",
+      citation: "Trang N"
+    }, null, 2)
+  ].join("\n");
+}
+
+export function buildMisconceptionHintPrompt(slideContext, questionText, chosenOptionText, correctOptionText, tierLabel) {
+  return [
+    "Bạn là AI Trợ giảng của VLearn, đang hỗ trợ một học viên vừa trả lời SAI trong phiên tự kiểm tra thích ứng.",
+    "Nhiệm vụ: (1) chẩn đoán NGẮN GỌN học viên có thể đang nhầm lẫn điều gì, (2) đưa ra 1 gợi ý ngắn giúp học viên",
+    "tự sửa (KHÔNG lộ đáp án đúng), và (3) 1 ví dụ ngắn nếu hữu ích.",
+    "",
+    "Câu hỏi: " + questionText,
+    "Đáp án học viên đã chọn (SAI): " + chosenOptionText,
+    "Đáp án đúng (chỉ để bạn tham chiếu, KHÔNG nhắc lại nguyên văn cho học viên): " + correctOptionText,
+    "Mức độ ngộ nhận: " + tierLabel + " ('near' = gần đúng nhưng nhầm 1 điểm cụ thể; 'far' = hiểu sai hẳn hướng khác).",
+    "",
+    "Ngữ cảnh slide (nguồn DUY NHẤT được dùng, không suy đoán ngoài đây):",
+    slideContext,
+    "",
+    "Yêu cầu: chẩn đoán + gợi ý phải bám sát ngữ cảnh trên, không bịa thêm khái niệm ngoài nguồn.",
+    "",
+    "BẮT BUỘC trả JSON đúng schema (không markdown):",
+    JSON.stringify({
+      misconception: "<chẩn đoán ngắn học viên đang nhầm gì>",
+      hint: "<gợi ý ngắn, không lộ đáp án đúng>",
+      example: "<ví dụ ngắn minh hoạ, để chuỗi rỗng nếu không cần thiết>"
+    }, null, 2)
+  ].join("\n");
+}
+
+export function buildVisionRegionPrompt(pageNum) {
+  return [
+    "Bạn là Trợ giảng AI trên VLearn. Học viên vừa vẽ khung khoanh vùng một phần của Trang " + pageNum +
+      " trong slide bài giảng và đính kèm ảnh chụp đúng vùng đó.",
+    "Nhiệm vụ: Giải thích NGẮN GỌN (tối đa 3 gạch đầu dòng) nội dung xuất hiện TRONG ẢNH ĐÍNH KÈM - có thể là",
+    "chữ, công thức, sơ đồ, biểu đồ hoặc hình minh hoạ.",
+    "",
+    "Yêu cầu:",
+    "1. CHỈ mô tả/giải thích những gì thực sự nhìn thấy trong ảnh đính kèm.",
+    "2. Nếu ảnh mờ, bị cắt thiếu ngữ cảnh hoặc không đủ để giải thích chắc chắn, hãy nói rõ giới hạn thay vì đoán.",
+    "3. Không suy đoán nội dung ngoài ảnh dựa trên tên bài học hoặc kiến thức nền.",
+    "4. BẮT BUỘC kết thúc bằng trích dẫn [Trang " + pageNum + "]."
+  ].join("\n");
+}
+
 export function buildEssayEvaluatorPrompt(questionText, rubricPointsJson, citation, studentAnswer, questionId) {
   return [
     "Bạn là AI Quiz Evaluator của VLearn.",

@@ -822,12 +822,21 @@ function normalizeQuestion(rawQuestion, lesson, type) {
     ) {
       return null;
     }
+    const rawTiers = rawQuestion.distractor_tiers && typeof rawQuestion.distractor_tiers === 'object'
+      ? rawQuestion.distractor_tiers
+      : {};
+    const distractorTiers = Object.fromEntries(
+      ['A', 'B', 'C', 'D']
+        .filter(key => key !== correctOption)
+        .map(key => [key, rawTiers[key] === 'near' ? 'near' : 'far'])
+    );
     return {
       id: rawQuestion.id,
       source_snippet: String(rawQuestion.source_snippet),
       question: String(rawQuestion.question),
       options: Object.fromEntries(['A', 'B', 'C', 'D'].map(key => [key, String(options[key])])),
       correct_option: correctOption,
+      distractor_tiers: distractorTiers,
       explanation: String(rawQuestion.explanation ?? 'Đáp án được đối chiếu với đoạn nguồn.'),
       citation: `Trang ${page}`
     };
@@ -856,6 +865,10 @@ function normalizeQuestion(rawQuestion, lesson, type) {
     rubric_points: normalizedRubric,
     citation: `Trang ${page}`
   };
+}
+
+export function validateSingleQuestion(rawQuestion, lesson) {
+  return normalizeQuestion(rawQuestion, lesson, 'mcq');
 }
 
 function optionSimilarity(first, second) {

@@ -8,7 +8,7 @@ export const AI_PROVIDERS = Object.freeze({
   gemini: Object.freeze({
     id: 'gemini',
     label: 'Gemini',
-    defaultModel: 'gemini-2.5-flash',
+    defaultModel: 'gemini-3.1-flash-lite',
     keyPlaceholder: 'Gemini API Key'
   })
 });
@@ -24,7 +24,9 @@ export function buildProviderRequest({
   promptText,
   json = false,
   temperature,
-  origin = ''
+  origin = '',
+  imageBase64 = '',
+  imageMimeType = 'image/png'
 }) {
   const provider = getProviderConfig(providerId);
   const selectedModel = String(model ?? '').trim() || provider.defaultModel;
@@ -34,6 +36,10 @@ export function buildProviderRequest({
     : json ? 0.1 : 0.2;
 
   if (provider.id === 'gemini') {
+    const parts = [{ text: prompt }];
+    if (imageBase64) {
+      parts.push({ inline_data: { mime_type: imageMimeType, data: imageBase64 } });
+    }
     return {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(selectedModel)}:generateContent`,
       options: {
@@ -43,7 +49,7 @@ export function buildProviderRequest({
           'x-goog-api-key': apiKey
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts }],
           generationConfig: {
             temperature: selectedTemperature,
             ...(json ? { responseMimeType: 'application/json' } : {})

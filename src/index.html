@@ -50,6 +50,7 @@
       <div class="slide-controls">
         <button class="slide-nav-btn" id="prevSlideBtn">◄ Trang Trước</button>
         <span style="font-size:13px; font-weight:600; color:#94a3b8;">Màn hình bài giảng VLearn Slide</span>
+        <button class="slide-nav-btn" id="toggleRegionDrawBtn" title="Chỉ khả dụng khi xem PDF thật đã tải lên">✏️ Vẽ khung để hỏi</button>
         <button class="slide-nav-btn" id="nextSlideBtn">Trang Sau ►</button>
       </div>
 
@@ -64,7 +65,10 @@
 
         <div class="pdf-slide-view" id="pdfSlideView" hidden>
           <div class="pdf-stage" id="pdfStage">
-            <canvas id="pdfCanvas" aria-label="Trang PDF đang hiển thị"></canvas>
+            <div class="pdf-canvas-wrap" id="pdfCanvasWrap">
+              <canvas id="pdfCanvas" aria-label="Trang PDF đang hiển thị"></canvas>
+              <div class="region-select-box" id="regionSelectBox" hidden></div>
+            </div>
             <div class="pdf-render-status" id="pdfRenderStatus">Đang dựng trang PDF…</div>
           </div>
           <details class="pdf-text-panel" open>
@@ -128,17 +132,20 @@
 
       <!-- Tab 2: Quiz View -->
       <div class="tab-content" id="tabQuiz">
-        <div style="padding: 16px; border-bottom: 1px solid var(--panel-border); background: #0f172a; display:flex; justify-content:space-between; align-items:center;">
+        <div style="padding: 16px; border-bottom: 1px solid var(--panel-border); background: #0f172a; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
           <div>
-            <div style="font-weight:700; font-size:14px; color:#fff;">End-of-Session Adaptive Quiz</div>
-            <div id="quizScopeText" style="font-size:12px; color:#94a3b8;">Câu hỏi chỉ được giữ lại khi khớp nguồn trên slide</div>
+            <div style="font-weight:700; font-size:14px; color:#fff;">Tự Kiểm Tra Hiểu Thật (Adaptive)</div>
+            <div id="quizScopeText" style="font-size:12px; color:#94a3b8;">Mỗi lượt 1 câu · sai thì hỏi lại câu dễ hơn cùng chủ đề · đúng thì sang chủ đề khó hơn</div>
           </div>
-          <button class="btn-submit-essay" id="btnGenerateQuiz" style="margin:0;">⚡ Khởi tạo Quiz</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-submit-essay" id="btnStartAdaptive" style="margin:0;">🎯 Bắt đầu tự kiểm tra</button>
+            <button class="action-pill" id="btnGenerateQuiz" style="margin:0;">⚡ Hoặc: bộ quiz đầy đủ 8-10 câu</button>
+          </div>
         </div>
 
         <div class="quiz-container" id="quizContainer">
           <div style="text-align:center; padding:40px; color:#94a3b8; font-size:13px;">
-            Bấm <b>"⚡ Khởi tạo Quiz"</b> để bắt đầu bài kiểm tra hiểu thật 3 phút cho bài học này!
+            Bấm <b>"🎯 Bắt đầu tự kiểm tra"</b> để bắt đầu — AI hỏi từng câu, sai thì hỏi lại câu dễ hơn, đúng thì sang chủ đề khó hơn.
           </div>
         </div>
       </div>

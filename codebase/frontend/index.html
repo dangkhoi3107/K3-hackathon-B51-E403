@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VLearn · Practice Coach — Demo giao diện</title>
+<style>
+  :root {
+    --bg: #EDEFE9;
+    --panel: #E1E5DC;
+    --panel-line: #C9CFC1;
+    --ink: #202821;
+    --ink-soft: #5B6459;
+    --accent: #C9862A;
+    --accent-strong: #B5761F;
+    --accent-ink: #4A3108;
+    --accent-wash: #F2DCAE;
+    --good: #3E7A57;
+    --good-wash: #DCEBE0;
+    --partial: #33627E;
+    --partial-wash: #DCE7EC;
+    --bad: #A8402F;
+    --bad-wash: #F2DBD5;
+    --card: #F6F5EF;
+    --shadow: 0 1px 2px rgba(32, 40, 33, 0.06), 0 8px 24px rgba(32, 40, 33, 0.07);
+    --radius: 10px;
+    --serif: Georgia, "Iowan Old Style", "Noto Serif", "Times New Roman", serif;
+    --sans: "Segoe UI", -apple-system, BlinkMacSystemFont, "Noto Sans", Roboto, Arial, sans-serif;
+    --mono: "Cascadia Code", "Consolas", "SFMono-Regular", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14170F;
+      --panel: #1C2016;
+      --panel-line: #333A2A;
+      --ink: #E7EAE1;
+      --ink-soft: #9AA391;
+      --accent: #E2A63B;
+      --accent-strong: #F0B94A;
+      --accent-ink: #2A1B04;
+      --accent-wash: #3A2C10;
+      --good: #5FA97C;
+      --good-wash: #1D2B21;
+      --partial: #6FA9C9;
+      --partial-wash: #1B2731;
+      --bad: #D97C6E;
+      --bad-wash: #2E1E19;
+      --card: #191D14;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14170F; --panel: #1C2016; --panel-line: #333A2A; --ink: #E7EAE1; --ink-soft: #9AA391;
+    --accent: #E2A63B; --accent-strong: #F0B94A; --accent-ink: #2A1B04; --accent-wash: #3A2C10;
+    --good: #5FA97C; --good-wash: #1D2B21; --partial: #6FA9C9; --partial-wash: #1B2731;
+    --bad: #D97C6E; --bad-wash: #2E1E19; --card: #191D14;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #EDEFE9; --panel: #E1E5DC; --panel-line: #C9CFC1; --ink: #202821; --ink-soft: #5B6459;
+    --accent: #C9862A; --accent-strong: #B5761F; --accent-ink: #4A3108; --accent-wash: #F2DCAE;
+    --good: #3E7A57; --good-wash: #DCEBE0; --partial: #33627E; --partial-wash: #DCE7EC;
+    --bad: #A8402F; --bad-wash: #F2DBD5; --card: #F6F5EF;
+    --shadow: 0 1px 2px rgba(32, 40, 33, 0.06), 0 8px 24px rgba(32, 40, 33, 0.07);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; border-radius: 4px; }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--panel-line);
+    background: var(--panel);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .mark {
+    font-family: var(--serif);
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+  }
+  .brand .mark em { font-style: normal; color: var(--accent-strong); }
+  .brand .sub { font-size: 0.8rem; color: var(--ink-soft); }
+  .lecture-chip {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+    background: var(--card);
+    border: 1px solid var(--panel-line);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+
+  .mode-toggle {
+    display: flex;
+    gap: 6px;
+    font-size: 0.76rem;
+  }
+  .mode-toggle button {
+    border: 1px solid var(--panel-line);
+    background: var(--card);
+    color: var(--ink-soft);
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .mode-toggle button[aria-pressed="true"] {
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1px;
+    background: var(--panel-line);
+    min-height: calc(100vh - 57px);
+  }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .pane { background: var(--bg); padding: 28px clamp(18px, 4vw, 40px); }
+  .pane-doc { background: var(--bg); }
+  .pane-coach { background: var(--panel); }
+
+  .pane-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+
+  .page-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin-bottom: 18px;
+  }
+  .page-chip .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--accent); }
+
+  .doc-title {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+
+  .doc-body {
+    max-width: 62ch;
+    font-family: var(--serif);
+    font-size: 1.04rem;
+    color: var(--ink);
+  }
+  .doc-body p { margin: 0 0 1em; }
+  .doc-body mark {
+    background: var(--accent-wash);
+    color: var(--ink);
+    padding: 0.02em 0.15em;
+    border-radius: 3px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .start-row {
+    margin-top: 26px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    padding: 11px 20px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    color: var(--ink-soft);
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 0.88rem;
+    cursor: pointer;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--ink); }
+
+  .rules-note {
+    margin-top: 22px;
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .rules-note .tag {
+    border: 1px solid var(--panel-line);
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--card);
+  }
+
+  /* --- Coach panel --- */
+  .coach-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .progress {
+    display: flex;
+    gap: 6px;
+  }
+  .progress .step {
+    width: 26px; height: 6px;
+    border-radius: 999px;
+    background: var(--panel-line);
+    transition: background 0.2s;
+  }
+  @media (prefers-reduced-motion: reduce) { .progress .step { transition: none; } }
+  .progress .step.correct { background: var(--good); }
+  .progress .step.partial { background: var(--partial); }
+  .progress .step.wrong { background: var(--bad); }
+  .progress .step.current { background: var(--accent); }
+
+  .score-mini {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+  }
+
+  .coach-empty {
+    background: var(--card);
+    border: 1px dashed var(--panel-line);
+    border-radius: var(--radius);
+    padding: 26px;
+    color: var(--ink-soft);
+    font-size: 0.92rem;
+  }
+  .coach-empty strong { color: var(--ink); display: block; margin-bottom: 6px; font-family: var(--serif); font-size: 1.05rem; }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+
+  .difficulty-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--accent-strong);
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .question-text {
+    font-family: var(--serif);
+    font-size: 1.12rem;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+
+  .choices { display: grid; gap: 8px; }
+  .choice-btn {
+    text-align: left;
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+  }
+  .choice-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .choice-btn .letter {
+    font-family: var(--mono);
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+  .choice-btn:disabled { cursor: default; }
+  .choice-btn.chosen.correct { border-color: var(--good); background: var(--good-wash); }
+  .choice-btn.chosen.partial { border-color: var(--partial); background: var(--partial-wash); }
+  .choice-btn.chosen.wrong { border-color: var(--bad); background: var(--bad-wash); }
+  .choice-btn.dim:not(.chosen) { opacity: 0.5; }
+
+  .feedback { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--panel-line); }
+  .state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 4px 11px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .state-badge.correct { background: var(--good-wash); color: var(--good); }
+  .state-badge.partial { background: var(--partial-wash); color: var(--partial); }
+  .state-badge.wrong { background: var(--bad-wash); color: var(--bad); }
+
+  .explanation { font-size: 0.92rem; margin: 0 0 10px; color: var(--ink); }
+  .quote {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 0 0 14px;
+  }
+
+  .action-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+  .action-chip svg { flex-shrink: 0; }
+
+  .summary-card { }
+  .summary-title { font-family: var(--serif); font-size: 1.2rem; margin: 0 0 4px; }
+  .summary-sub { font-size: 0.85rem; color: var(--ink-soft); margin: 0 0 18px; }
+  .summary-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: block;
+  }
+  .stat.correct .num { color: var(--good); }
+  .stat.partial .num { color: var(--partial); }
+  .stat.wrong .num { color: var(--bad); }
+  .stat .lbl { font-size: 0.72rem; color: var(--ink-soft); }
+
+  .review-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+  .review-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 9px 13px;
+    font-size: 0.86rem;
+  }
+  .review-list .review-link {
+    font-size: 0.78rem;
+    color: var(--accent-strong);
+    font-weight: 600;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+
+  .footnote { font-size: 0.78rem; color: var(--ink-soft); }
+
+  .refusal-card {
+    border-left: 3px solid var(--bad);
+  }
+  .refusal-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--bad); margin: 0 0 8px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">VLearn <em>Practice Coach</em></span>
+    <span class="sub">Demo giao diện — luồng thao tác, chưa nối AI thật</span>
+  </div>
+  <span class="lecture-chip" id="lectureChip">Buổi Foundation · Transformer &amp; Attention</span>
+</header>
+
+<div class="layout">
+
+  <section class="pane pane-doc">
+    <p class="pane-label">Trang tài liệu</p>
+
+    <div class="mode-toggle" role="group" aria-label="Chọn kịch bản demo" style="margin-bottom: 18px;">
+      <button type="button" id="modeFull" aria-pressed="true">Trang đủ nội dung</button>
+      <button type="button" id="modeThin" aria-pressed="false">Trang mỏng (demo từ chối)</button>
+    </div>
+
+    <div class="page-chip" id="pageChip"><span class="dot"></span> Self-attention · [T06-129 · T06-131 · T06-132]</div>
+
+    <h1 class="doc-title" id="docTitle">Self-attention: ví dụ "con mèo ngồi trên bàn"</h1>
+
+    <div class="doc-body" id="docBody">
+      <p>Ta có câu: "Con mèo ngồi lên bàn, nó rất đáng yêu". Giả sử bạn chỉ 6 tuổi thôi, đọc câu này thì chưa chắc biết "nó" đang chỉ con mèo hay cái bàn. <mark>Cơ chế self-attention giúp mỗi từ tự nhìn sang các từ khác trong câu, tính ra mức độ tương đồng (similarity score), rồi từ đó đoán được "nó" đang gán với từ nào.</mark></p>
+      <p>Ví dụ dễ hình dung: bạn cầm một cuốn sách "Kiến trúc cổ ở Hà Nội" bước vào thư viện. Trên kệ có các cuốn với tiêu đề khác nhau — đó là <b>nhãn</b> bên ngoài, chính là <b>Key</b>. Bên trong mỗi cuốn là nội dung thật — đó là <b>Value</b>. Còn cuốn sách bạn đang cầm đi tìm — thứ bạn muốn so khớp — chính là <b>Query</b>. Chữ Q đại diện cho query — cái truy vấn gửi vào; chữ K đại diện cho key — cái nhãn; chữ V là value — nội dung bên trong.</p>
+      <p>Quá trình này lặp qua từng từ: nó so query với từng key, tìm ra key khớp nhất, rồi lấy value tương ứng. Với câu ví dụ, mô hình tính ra "nó" và "mèo" có similarity score cao nhất, nên nó đoán rằng "nó" đang gán với con mèo, thay vì gán cho từ "bàn".</p>
+    </div>
+
+    <div class="start-row">
+      <button class="btn-primary" id="startBtn" type="button">Tự kiểm tra trang này</button>
+      <button class="btn-ghost" id="resetBtn" type="button" hidden>Làm lại phiên</button>
+    </div>
+
+    <div class="rules-note">
+      <span class="tag">Tối đa 5 câu / phiên</span>
+      <span class="tag">Không tính điểm chính thức</span>
+      <span class="tag">Mọi câu hỏi truy xuất được về trang nguồn</span>
+    </div>
+  </section>
+
+  <section class="pane pane-coach">
+    <div class="coach-head">
+      <p class="pane-label" style="margin:0;">Practice Coach</p>
+      <div class="progress" id="progressDots" hidden></div>
+    </div>
+
+    <div id="coachBody">
+      <div class="coach-empty" id="coachEmpty">
+        <strong>Chưa bắt đầu phiên tự kiểm tra</strong>
+        Đọc đoạn được bôi vàng ở tài liệu bên trái, sau đó bấm “Tự kiểm tra trang này”. Coach sẽ đặt từng câu hỏi bám đúng nội dung trang, xem bạn hiểu đúng — hiểu một phần — hay đang hiểu sai, rồi chọn hành động phù hợp (hỏi tiếp, dễ hơn, khó hơn, gợi ý, hoặc yêu cầu xem lại đoạn).
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var QUESTIONS = [
+    {
+      difficulty: "Trung bình",
+      question: "Vì sao mô hình cần cơ chế self-attention để hiểu từ \"nó\" trong câu \"Con mèo ngồi lên bàn, nó rất đáng yêu\"?",
+      choices: [
+        { text: "Vì \"nó\" là từ hiếm, mô hình chưa từng gặp trong lúc huấn luyện", tag: "wrong",
+          explanation: "Không đúng — vấn đề ở đây không phải độ hiếm của từ, mà là từ \"nó\" mơ hồ: cần nhìn ngữ cảnh mới biết nó ám chỉ ai.",
+          quote: "Giả sử bạn chỉ 6 tuổi thôi, đọc câu này thì chưa chắc biết \"nó\" đang chỉ con mèo hay cái bàn." },
+        { text: "Vì mô hình cần nhìn các từ khác trong câu, tính độ tương đồng rồi mới đoán \"nó\" ám chỉ từ nào", tag: "correct",
+          explanation: "Chính xác — đây đúng là việc self-attention làm: mỗi từ nhìn sang các từ khác, tính similarity score, rồi suy ra từ \"nó\" đang gán cho từ nào.",
+          quote: "Cơ chế self-attention giúp mỗi từ tự nhìn sang các từ khác trong câu, tính ra mức độ tương đồng, rồi từ đó đoán được \"nó\" đang gán với từ nào." },
+        { text: "Vì câu này bị lỗi ngữ pháp, cần sửa trước khi xử lý", tag: "wrong",
+          explanation: "Không đúng — câu hoàn toàn đúng ngữ pháp tiếng Việt, vấn đề chỉ là từ \"nó\" mơ hồ về nghĩa, không phải lỗi câu.",
+          quote: "Ta có câu: \"Con mèo ngồi lên bàn, nó rất đáng yêu\"." },
+        { text: "Vì \"nó\" luôn được mặc định gán cho danh từ đứng đầu câu", tag: "partial",
+          explanation: "Gần đúng ở kết quả (mèo đứng trước) nhưng sai bản chất — mô hình không dùng luật cố định vị trí đầu câu, mà tính similarity score thật sự giữa các từ.",
+          quote: "Cơ chế self-attention giúp mỗi từ tự nhìn sang các từ khác trong câu, tính ra mức độ tương đồng." }
+      ]
+    },
+    {
+      difficulty: "Dễ hơn · củng cố",
+      question: "Trong ví dụ thư viện, \"tiêu đề / nhãn bên ngoài cuốn sách\" tương ứng với thành phần nào?",
+      choices: [
+        { text: "Query (Q)", tag: "wrong",
+          explanation: "Không đúng — Query là cuốn sách bạn đang cầm đi tìm (truy vấn), không phải nhãn trên kệ sách.",
+          quote: "Chữ Q đại diện cho query — cái truy vấn gửi vào." },
+        { text: "Key (K)", tag: "correct",
+          explanation: "Chính xác — nhãn/tiêu đề bên ngoài mỗi cuốn sách chính là Key, dùng để so khớp với query.",
+          quote: "Trên kệ có các cuốn với tiêu đề khác nhau — đó là nhãn bên ngoài, chính là Key." },
+        { text: "Value (V)", tag: "partial",
+          explanation: "Gần đúng vì cũng gắn với cuốn sách, nhưng Value là nội dung BÊN TRONG cuốn sách, không phải cái nhãn bên ngoài.",
+          quote: "Bên trong mỗi cuốn là nội dung thật — đó là Value." },
+        { text: "Temperature", tag: "wrong",
+          explanation: "Không đúng — temperature là tham số điều chỉnh độ sáng tạo khi sinh văn bản, không thuộc bộ ba Q-K-V.",
+          quote: "Chữ Q đại diện cho query — cái truy vấn gửi vào; chữ K đại diện cho key — cái nhãn; chữ V là value — nội dung bên trong." }
+      ]
+    },
+    {
+      difficulty: "Khó hơn",
+      question: "Sau khi Query khớp đúng với một Key, mô hình dùng Value (V) để làm gì?",
+      choices: [
+        { text: "V là nội dung thật sự được lấy ra, sau khi đã tìm đúng \"cuốn sách\" (key) khớp với truy vấn", tag: "correct",
+          explanation: "Chính xác — một khi key khớp với query, value chính là nội dung/thông tin thực sự được trả về.",
+          quote: "Bên trong mỗi cuốn là nội dung thật — đó là Value." },
+        { text: "V dùng để đặt lại tên cho cuốn sách sau khi đọc xong", tag: "wrong",
+          explanation: "Không đúng — value không liên quan đến việc đổi tên/nhãn, nó chỉ là nội dung được truy xuất.",
+          quote: "Bên trong mỗi cuốn là nội dung thật — đó là Value." },
+        { text: "V là điểm số đo tốc độ xử lý song song của mô hình", tag: "wrong",
+          explanation: "Không đúng — đang nhầm với khái niệm xử lý song song (một đặc điểm khác của Transformer), không phải vai trò của Value.",
+          quote: "Bên trong mỗi cuốn là nội dung thật — đó là Value." },
+        { text: "V quyết định temperature khi mô hình sinh văn bản", tag: "wrong",
+          explanation: "Không đúng — value và temperature là hai khái niệm khác nhau hoàn toàn trong tài liệu.",
+          quote: "Bên trong mỗi cuốn là nội dung thật — đó là Value." }
+      ]
+    },
+    {
+      difficulty: "Khó hơn",
+      question: "Vì sao mô hình kết luận \"nó\" gán với \"mèo\" chứ không phải \"bàn\"?",
+      choices: [
+        { text: "Vì \"mèo\" đứng trước \"bàn\" trong câu nên luôn được ưu tiên", tag: "wrong",
+          explanation: "Không đúng — tài liệu không nói về luật ưu tiên theo vị trí, mà về điểm tương đồng được tính ra.",
+          quote: "\"nó\" và \"mèo\" có similarity score cao nhất, nên nó đoán rằng \"nó\" đang gán với con mèo." },
+        { text: "Vì \"mèo\" và \"bàn\" có similarity score bằng nhau nên mô hình chọn ngẫu nhiên", tag: "wrong",
+          explanation: "Không đúng — tài liệu nói rõ \"nó\" và \"mèo\" có similarity score CAO NHẤT, tức không bằng nhau và không phải chọn ngẫu nhiên.",
+          quote: "\"nó\" và \"mèo\" có similarity score cao nhất." },
+        { text: "Vì \"nó\" và \"mèo\" có similarity score cao nhất sau quá trình so khớp Q-K-V", tag: "correct",
+          explanation: "Chính xác — đây đúng là cơ chế: sau khi so khớp Q với từng K, cặp có điểm tương đồng cao nhất sẽ được chọn.",
+          quote: "Mô hình tính ra \"nó\" và \"mèo\" có similarity score cao nhất, nên nó đoán rằng \"nó\" đang gán với con mèo, thay vì gán cho từ \"bàn\"." },
+        { text: "Vì \"mèo\" là danh từ chỉ sinh vật, còn \"bàn\" chỉ đồ vật, mô hình có luật ưu tiên sinh vật", tag: "partial",
+          explanation: "Nghe hợp lý nhưng không đúng cơ chế thật — tài liệu không nhắc tới luật phân loại sinh vật/đồ vật, mà là phép tính similarity score giữa các vector.",
+          quote: "Mô hình tính ra \"nó\" và \"mèo\" có similarity score cao nhất." }
+      ]
+    }
+  ];
+
+  var THIN_TITLE = "Token và cơ chế dự đoán next token";
+
+  var state = { started: false, thin: false, index: 0, results: [], answeredThis: false };
+
+  var els = {
+    startBtn: document.getElementById("startBtn"),
+    resetBtn: document.getElementById("resetBtn"),
+    coachBody: document.getElementById("coachBody"),
+    coachEmpty: document.getElementById("coachEmpty"),
+    progressDots: document.getElementById("progressDots"),
+    modeFull: document.getElementById("modeFull"),
+    modeThin: document.getElementById("modeThin"),
+    docTitle: document.getElementById("docTitle"),
+    docBody: document.getElementById("docBody"),
+    pageChip: document.getElementById("pageChip"),
+  };
+
+  var FULL_BODY = els.docBody.innerHTML;
+  var THIN_BODY = '<p style="color:var(--ink-soft); font-style:italic;">(Mục chỉ có tiêu đề, chưa có nội dung slide bên dưới.)</p>';
+
+  function setMode(thin) {
+    state.thin = thin;
+    els.modeFull.setAttribute("aria-pressed", String(!thin));
+    els.modeThin.setAttribute("aria-pressed", String(thin));
+    els.docTitle.textContent = thin ? THIN_TITLE : "Mô hình Double Diamond";
+    els.docBody.innerHTML = thin ? THIN_BODY : FULL_BODY;
+    els.pageChip.innerHTML = thin
+      ? '<span class="dot"></span> Mục tiêu đề · [T06-134]'
+      : '<span class="dot"></span> Self-attention · [T06-129 · T06-131 · T06-132]';
+    resetSession();
+  }
+
+  function resetSession() {
+    state.started = false;
+    state.index = 0;
+    state.results = [];
+    els.startBtn.hidden = false;
+    els.startBtn.disabled = false;
+    els.resetBtn.hidden = true;
+    els.progressDots.hidden = true;
+    els.progressDots.innerHTML = "";
+    els.coachBody.innerHTML = "";
+    els.coachBody.appendChild(els.coachEmpty);
+  }
+
+  function buildProgressDots() {
+    els.progressDots.innerHTML = "";
+    els.progressDots.hidden = false;
+    for (var i = 0; i < QUESTIONS.length; i++) {
+      var d = document.createElement("span");
+      d.className = "step" + (i === 0 ? " current" : "");
+      els.progressDots.appendChild(d);
+    }
+  }
+
+  function updateProgressDots() {
+    var steps = els.progressDots.querySelectorAll(".step");
+    for (var i = 0; i < steps.length; i++) {
+      steps[i].classList.remove("correct", "partial", "wrong", "current");
+      if (i < state.results.length) {
+        steps[i].classList.add(state.results[i]);
+      } else if (i === state.index) {
+        steps[i].classList.add("current");
+      }
+    }
+  }
+
+  function icon(tag) {
+    if (tag === "correct") return "✓";
+    if (tag === "partial") return "◐";
+    return "✕";
+  }
+  function label(tag) {
+    if (tag === "correct") return "Hiểu đúng";
+    if (tag === "partial") return "Hiểu một phần";
+    return "Hiểu sai";
+  }
+  function nextActionText(tag) {
+    if (tag === "correct") return "Coach sẽ hỏi câu tiếp theo, khó hơn một chút.";
+    if (tag === "partial") return "Coach đưa gợi ý ở trên, rồi tiếp tục với câu vừa sức hơn.";
+    return "Coach sẽ giải thích lại và hỏi câu tiếp theo dễ hơn để củng cố.";
+  }
+
+  function renderThinRefusal() {
+    els.coachBody.innerHTML =
+      '<div class="card refusal-card">' +
+        '<p class="refusal-title">&#9888; Không tạo câu hỏi</p>' +
+        '<p class="explanation">Trang này chỉ có tiêu đề mục, chưa có nội dung kỹ thuật để đặt câu hỏi kiểm tra hiểu bài có căn cứ. Thay vì đoán hoặc bịa câu hỏi, Coach dừng lại ở đây.</p>' +
+        '<p class="action-chip">&rarr; Gợi ý cho học viên: mở đúng trang có nội dung, hoặc đợi giảng viên bổ sung slide.</p>' +
+      "</div>";
+    els.startBtn.hidden = true;
+    els.resetBtn.hidden = false;
+  }
+
+  function renderQuestion() {
+    var q = QUESTIONS[state.index];
+    var html = '<div class="card">' +
+      '<p class="difficulty-label">Câu ' + (state.index + 1) + " / " + QUESTIONS.length + " &middot; " + q.difficulty + "</p>" +
+      '<p class="question-text">' + q.question + "</p>" +
+      '<div class="choices" id="choicesWrap">';
+    var letters = ["A", "B", "C", "D"];
+    q.choices.forEach(function (c, i) {
+      html += '<button type="button" class="choice-btn" data-i="' + i + '">' +
+        '<span class="letter">' + letters[i] + "</span><span>" + c.text + "</span></button>";
+    });
+    html += "</div><div id=\"feedbackWrap\"></div></div>";
+    els.coachBody.innerHTML = html;
+
+    var buttons = els.coachBody.querySelectorAll(".choice-btn");
+    buttons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        onAnswer(q, parseInt(btn.getAttribute("data-i"), 10), buttons);
+      });
+    });
+  }
+
+  function onAnswer(q, i, buttons) {
+    var chosen = q.choices[i];
+    buttons.forEach(function (b, bi) {
+      b.disabled = true;
+      if (bi === i) {
+        b.classList.add("chosen", chosen.tag);
+      } else {
+        b.classList.add("dim");
+      }
+    });
+
+    state.results.push(chosen.tag);
+    updateProgressDots();
+
+    var fb = document.getElementById("feedbackWrap");
+    fb.innerHTML =
+      '<div class="feedback">' +
+        '<span class="state-badge ' + chosen.tag + '">' + icon(chosen.tag) + " " + label(chosen.tag) + "</span>" +
+        '<p class="explanation">' + chosen.explanation + "</p>" +
+        '<p class="quote">&ldquo;' + chosen.quote + '&rdquo; &mdash; trang nguồn</p>' +
+        '<p class="action-chip">&rarr; ' + nextActionText(chosen.tag) + "</p>" +
+        '<button type="button" class="btn-primary" id="nextQBtn">' +
+          (state.index + 1 < QUESTIONS.length ? "Câu tiếp theo" : "Xem tổng kết phiên") +
+        "</button>" +
+      "</div>";
+
+    document.getElementById("nextQBtn").addEventListener("click", function () {
+      state.index++;
+      if (state.index < QUESTIONS.length) {
+        renderQuestion();
+        updateProgressDots();
+      } else {
+        renderSummary();
+      }
+    });
+  }
+
+  function renderSummary() {
+    var counts = { correct: 0, partial: 0, wrong: 0 };
+    state.results.forEach(function (t) { counts[t]++; });
+
+    var reviewItems = [];
+    QUESTIONS.forEach(function (q, i) {
+      if (state.results[i] !== "correct") {
+        reviewItems.push({ q: q.question, tag: state.results[i] });
+      }
+    });
+
+    var html = '<div class="card summary-card">' +
+      '<p class="summary-title">Tổng kết phiên</p>' +
+      '<p class="summary-sub">Kết quả này không tính vào điểm chính thức — chỉ để bạn biết nên ôn lại đâu trước khi làm quiz/lab.</p>' +
+      '<div class="summary-stats">' +
+        '<div class="stat correct"><span class="num">' + counts.correct + '</span><span class="lbl">Hiểu đúng</span></div>' +
+        '<div class="stat partial"><span class="num">' + counts.partial + '</span><span class="lbl">Một phần</span></div>' +
+        '<div class="stat wrong"><span class="num">' + counts.wrong + '</span><span class="lbl">Hiểu sai</span></div>' +
+      "</div>";
+
+    if (reviewItems.length) {
+      html += '<p class="footnote" style="margin-bottom:8px;"><strong>Nên xem lại:</strong></p><ul class="review-list">';
+      reviewItems.forEach(function (r) {
+        html += "<li><span>" + r.q + '</span><button type="button" class="review-link" data-scroll="doc">Xem lại trang &rarr;</button></li>';
+      });
+      html += "</ul>";
+    } else {
+      html += '<p class="footnote">Bạn trả lời đúng toàn bộ ngay từ lần đầu — sẵn sàng cho phần tiếp theo.</p>';
+    }
+
+    html += "</div>";
+    els.coachBody.innerHTML = html;
+    els.startBtn.hidden = true;
+    els.resetBtn.hidden = false;
+
+    els.coachBody.querySelectorAll('[data-scroll="doc"]').forEach(function (b) {
+      b.addEventListener("click", function () {
+        document.querySelector(".pane-doc").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
+  els.startBtn.addEventListener("click", function () {
+    state.started = true;
+    els.startBtn.hidden = true;
+
+    if (state.thin) {
+      renderThinRefusal();
+      return;
+    }
+
+    buildProgressDots();
+    renderQuestion();
+  });
+
+  els.resetBtn.addEventListener("click", resetSession);
+  els.modeFull.addEventListener("click", function () { setMode(false); });
+  els.modeThin.addEventListener("click", function () { setMode(true); });
+
+  resetSession();
+})();
+</script>
+
+</body>
+</html>
