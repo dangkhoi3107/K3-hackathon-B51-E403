@@ -55,7 +55,7 @@ Một repo nhóm, cấu trúc như sau. Spec chốt lúc 23:59 ngày 1; bản ho
 repo/
 ├── README.md          ← thành viên (mã HV + tên) + phân công có tên từng phần
 ├── spec.md            ← AI Spec theo 03-template-ai-spec.md
-├── demo-slides.pdf    ← slide 6 trang theo 02-guide.md §5.1
+├── docs/agent-architecture-deck.html  ← slide trình bày (deploy trên Claude), thay demo-slides.pdf
 ├── codebase/          ← prototype (ghi rõ phần nào mock)
 ├── eval/              ← golden set + bảng kết quả các lượt chạy
 ├── validation/        ← feedback log từ vòng user test
