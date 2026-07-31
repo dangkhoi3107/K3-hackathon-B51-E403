@@ -2,7 +2,7 @@
 
 ## 1. Vai trò của em trong nhóm
 
-Trong hackathon này, em thuộc nhóm G17 - Zone E403, tham gia dự án **VLearn Grounding Tutor & End-of-Session Quiz Agent**. Theo phân công trong README, vai trò chính của em là **Demo & Dry-run**, phụ trách phần chuẩn bị và luyện tập demo cho sản phẩm, với artifact liên quan là `demo-slides.pdf`.
+Trong hackathon này, em thuộc nhóm B51 - Zone 6, tham gia dự án **VLearn Grounding Tutor & End-of-Session Quiz Agent**. Theo phân công trong README, vai trò chính của em là **Demo & Dry-run**, phụ trách phần chuẩn bị và luyện tập demo cho sản phẩm, với artifact liên quan là `demo-slides.pdf`.
 
 Dự án của nhóm không chỉ là một bài code, mà là một bài tư duy sản phẩm AI theo hướng **SPEC -> Prototype -> Demo**. Vì vậy, phần việc của em tập trung vào việc giúp nhóm kể được câu chuyện sản phẩm rõ ràng: vấn đề của học viên là gì, vì sao giải pháp này đáng làm, prototype chứng minh được điều gì, và khi demo thì cần show đúng phần quan trọng nhất.
 
