@@ -60,7 +60,14 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     overflow: hidden;
   }
-  .serif { font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif; }
+  /* Georgia/Palatino thiếu glyph cho nguyên âm tiếng Việt 2 dấu chồng (ằ, ố, ệ...) -
+     trình duyệt phải mượn dấu từ font khác nên bị lệch. Dùng font hệ thống có phủ
+     tiếng Việt đầy đủ, giữ độ nổi bật bằng weight/spacing thay vì đổi họ chữ. */
+  .serif {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
   .mono {
     font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
   }
