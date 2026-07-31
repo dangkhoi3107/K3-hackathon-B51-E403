@@ -4,20 +4,24 @@
     "category": "standard_grounded_qa",
     "risk_class": "① nguồn sự thật",
     "lesson_id": "day1-foundation",
-    "input_query": "Giải thích bức tranh AI, Machine Learning, Deep Learning, Generative AI ở Trang 5",
+    "input_query": "AI, ML, Deep Learning, GenAI, LLM — nằm ở đâu trong cùng một hệ?",
     "expected_page_citation": "Trang 5",
     "expected_keywords": ["vòng tròn", "Generative AI"],
-    "must_refuse": false
+    "must_refuse": false,
+    "source_turn_id": "T0851",
+    "source_note": "Câu hỏi thật, giữ nguyên văn từ chatlog VLearn (data/vlearn-pack/chatlog/, turn T0851)."
   },
   {
     "id": "TC02",
     "category": "standard_grounded_qa",
     "risk_class": "④ đặc thù domain",
     "lesson_id": "day1-foundation",
-    "input_query": "Vì sao Symbolic AI và Expert System chạm trần, dẫn tới hai mùa đông của AI?",
+    "input_query": "Giải thích thuật ngữ mùa đông AI trong slide",
     "expected_page_citation": "Trang 11",
     "expected_keywords": ["chạm trần", "chuyên gia"],
-    "must_refuse": false
+    "must_refuse": false,
+    "source_turn_id": "T0413",
+    "source_note": "Câu hỏi thật, giữ nguyên văn từ chatlog VLearn (turn T0413)."
   },
   {
     "id": "TC03",
@@ -27,17 +31,21 @@
     "input_query": "Mô hình Double Diamond gồm những giai đoạn nào?",
     "expected_page_citation": "Trang 12",
     "expected_keywords": ["problem discovery", "solution discovery"],
-    "must_refuse": false
+    "must_refuse": false,
+    "source_turn_id": "T0611",
+    "source_note": "Chủ đề xác nhận thật từ chatlog VLearn (turn T0611, học viên hỏi giải thích hình Double Diamond); câu hỏi ở đây viết lại tường minh vì bản gốc phụ thuộc ngữ cảnh vùng bôi đen."
   },
   {
     "id": "TC04",
     "category": "standard_grounded_qa",
     "risk_class": "④ đặc thù domain",
     "lesson_id": "day2-problem-framing",
-    "input_query": "Dogfooding trong xây dựng sản phẩm nghĩa là gì theo slide?",
+    "input_query": "dogfooding",
     "expected_page_citation": "Trang 19",
     "expected_keywords": ["Jira", "Slack"],
-    "must_refuse": false
+    "must_refuse": false,
+    "source_turn_id": "T0808",
+    "source_note": "Câu hỏi thật, giữ nguyên văn từ chatlog VLearn (turn T0808) — chỉ đúng 1 từ, kiểm tra agent vẫn tra cứu đúng dù câu hỏi rất ngắn."
   },
   {
     "id": "TC05",
@@ -54,10 +62,12 @@
     "category": "standard_grounded_qa",
     "risk_class": "① nguồn sự thật",
     "lesson_id": "day1-foundation",
-    "input_query": "AlphaGo tự học bằng cách nào trước khi đấu với Lee Sedol?",
+    "input_query": "Mô tả về AlphaGo chi tiết",
     "expected_page_citation": "Trang 22",
     "expected_keywords": ["150.000", "tự chơi"],
-    "must_refuse": false
+    "must_refuse": false,
+    "source_turn_id": "T0882",
+    "source_note": "Câu hỏi thật từ chatlog VLearn (turn T0882: \"MÔ TẢ VỀ ALPHAGO CHI TIẾT\"), chuẩn hoá lại chữ hoa/thường."
   },
   {
     "id": "TC07",
@@ -99,7 +109,57 @@
     "selected_text": "đọc cả cụm câu cùng lúc",
     "expected_page_citation": "Trang 28",
     "expected_keywords": ["attention", "Transformer"],
-    "must_refuse": false
+    "must_refuse": false,
+    "source_turn_id": "T0098",
+    "source_note": "Chủ đề xác nhận thật từ chatlog VLearn (turn T0098: \"giair thích cơ chế attention, mutilhead\" — giữ nguyên lỗi chính tả gốc cho thấy học viên gõ thật)."
+  },
+  {
+    "id": "TC21",
+    "category": "standard_grounded_qa",
+    "risk_class": "④ đặc thù domain",
+    "lesson_id": "day1-foundation",
+    "input_query": "transformer là gì",
+    "expected_page_citation": "Trang 28",
+    "expected_keywords": ["RNN", "cả cụm"],
+    "must_refuse": false,
+    "source_turn_id": "T1259",
+    "source_note": "Câu hỏi thật, giữ nguyên văn từ chatlog VLearn (turn T1259)."
+  },
+  {
+    "id": "TC22",
+    "category": "standard_grounded_qa",
+    "risk_class": "④ đặc thù domain",
+    "lesson_id": "day1-foundation",
+    "input_query": "RNN và transformer khác nhau ơqr đâu",
+    "expected_page_citation": "Trang 28",
+    "expected_keywords": ["quên", "attention"],
+    "must_refuse": false,
+    "source_turn_id": "T1239",
+    "source_note": "Câu hỏi thật, giữ nguyên văn kể cả lỗi gõ phím (\"ơqr\" = \"ở\") từ chatlog VLearn (turn T1239)."
+  },
+  {
+    "id": "TC23",
+    "category": "standard_grounded_qa",
+    "risk_class": "④ đặc thù domain",
+    "lesson_id": "day1-foundation",
+    "input_query": "Deep Learning khác gì so với Machine Learning truyền thống?",
+    "expected_page_citation": "Trang 5",
+    "expected_keywords": ["mạng neuron", "dữ liệu"],
+    "must_refuse": false,
+    "source_turn_id": "T0914",
+    "source_note": "Câu hỏi thật, giữ nguyên văn từ chatlog VLearn (turn T0914)."
+  },
+  {
+    "id": "TC24",
+    "category": "standard_grounded_qa",
+    "risk_class": "④ đặc thù domain",
+    "lesson_id": "day1-foundation",
+    "input_query": "Hãy giải thích về attention mechanism",
+    "expected_page_citation": "Trang 28",
+    "expected_keywords": ["attention", "cả cụm"],
+    "must_refuse": false,
+    "source_turn_id": "T0984",
+    "source_note": "Câu hỏi thật, giữ nguyên văn từ chatlog VLearn (turn T0984)."
   },
   {
     "id": "TC11",
