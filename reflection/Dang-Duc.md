@@ -2,7 +2,7 @@
 
 ## 1. Vai trò của em trong nhóm
 
-Trong mini hackathon này, em là **Nguyễn Đăng Đức**, mã học viên **2A202601787**, thuộc **Nhóm G17 — Zone E403** (Dự án: **VLearn Grounding Tutor & End-of-Session Quiz Agent**). 
+Trong mini hackathon này, em là **Nguyễn Đăng Đức**, mã học viên **2A202601787**, thuộc **Nhóm B51 — Zone 6** (Dự án: **VLearn Grounding Tutor & End-of-Session Quiz Agent**). 
 
 Theo phân công công việc trong `README.md` và [`spec.md` §8](../spec.md#§8-phân-công--kế-hoạch), vai trò của em là **Evidence & Validation**, phụ trách chính các artifact thuộc thư mục [`validation/`](../validation/) bao gồm `feedback-log.md` và `changelog.md`, đồng thời đóng góp trực tiếp phần bằng chứng nỗi đau (Evidence & Mining Data) tại [§1 & §2 trong `spec.md`](../spec.md#§1-user--job).
 
