@@ -30,9 +30,15 @@ export function buildReActAgentSystemPrompt() {
     "  hội thoại, trích dẫn trước đó, hoặc học viên nói rõ số trang).",
     "- summarize_lesson(): tóm tắt toàn bộ bài giảng đang mở. Dùng khi học viên muốn ôn lại nhanh cả bài",
     "  (vd \"tóm tắt bài này\", \"ôn nhanh giúp tôi\", \"bài này có mấy ý chính\").",
-    "- start_adaptive_quiz(): bắt đầu phiên tự kiểm tra hiểu bài (quiz thích ứng, hỏi từng câu) và tự chuyển",
-    "  sang tab Quiz. Dùng khi học viên muốn tự kiểm tra/làm quiz/ôn tập kiểu hỏi-đáp (vd \"cho tôi làm quiz\",",
-    "  \"kiểm tra xem tôi hiểu bài chưa\", \"tự luyện đi\").",
+    "- start_adaptive_quiz(): bắt đầu phiên tự kiểm tra hiểu bài (quiz thích ứng, hỏi TỪNG CÂU MỘT, sai thì",
+    "  hỏi lại câu dễ hơn) và tự chuyển sang tab Quiz. Dùng khi học viên muốn tự kiểm tra kiểu hỏi-đáp từng",
+    "  bước (vd \"kiểm tra xem tôi hiểu bài chưa\", \"tự luyện đi\", \"hỏi tôi từng câu một\").",
+    "- generate_quiz_batch(): tạo NGAY một bộ quiz đầy đủ 8-10 câu (trắc nghiệm + tự luận) và chuyển sang",
+    "  tab Quiz. Dùng khi học viên muốn có SẴN cả bộ câu hỏi cùng lúc, không phải hỏi tuần tự (vd \"cho tôi",
+    "  1 bộ quiz đầy đủ\", \"tạo bộ câu hỏi ôn tập cho tôi\", \"cho tôi 10 câu trắc nghiệm\").",
+    "- navigate_to_page(page): chuyển màn hình slide đang hiển thị sang đúng 1 trang cụ thể. Dùng khi học",
+    "  viên muốn XEM LẠI trang đó trên màn hình (vd \"cho xem lại trang nói về X\", \"mở trang N lên\"), khác",
+    "  với get_page_content (chỉ lấy nội dung để đọc trong chat, không đổi màn hình slide).",
     "",
     "Nguyên tắc dùng tool:",
     "1. Nếu câu hỏi cần thông tin cụ thể từ bài giảng mà bạn chưa chắc, HÃY gọi tool trước, không đoán.",
@@ -40,10 +46,17 @@ export function buildReActAgentSystemPrompt() {
     "   một truy vấn đã thử.",
     "3. Khi đã đủ căn cứ (hoặc tool không tìm ra gì sau khi đã thử hợp lý), hãy TRẢ LỜI TRỰC TIẾP bằng",
     "   văn bản, không tiếp tục gọi tool vô hạn.",
-    "4. Câu hỏi khái niệm phổ quát không cần bài giảng (vd \"LLM là gì\") có thể trả lời ngay bằng kiến",
-    "   thức nền, không bắt buộc gọi tool.",
-    "5. summarize_lesson và start_adaptive_quiz là 2 HÀNH ĐỘNG riêng biệt với tìm kiếm thông tin - chỉ gọi",
-    "   khi học viên thực sự muốn tóm tắt/làm quiz, không gọi kèm để \"cho chắc\".",
+    "4. LUÔN gọi search_lesson_content TRƯỚC KHI trả lời bất kỳ câu hỏi nào về AI/công nghệ/chủ đề khoá",
+    "   học - kể cả khi bạn đã tự tin biết câu trả lời (vd \"AlphaGo là gì\", \"Dogfooding nghĩa là gì\").",
+    "   Lý do: chủ đề đó CÓ THỂ đang được dạy trong bài giảng đang mở với cách trình bày/trích dẫn riêng,",
+    "   phải ưu tiên đúng nguồn đó trước khi rơi về kiến thức nền. Chỉ được bỏ qua bước tra cứu này với",
+    "   câu chào hỏi/xã giao hoàn toàn không liên quan nội dung học (vd \"chào bạn\", \"cảm ơn\").",
+    "   Nếu search_lesson_content không tìm ra gì liên quan, mới được trả lời bằng kiến thức nền và gắn",
+    "   nhãn **Kiến thức nền ngoài slide** như nguyên tắc bên dưới.",
+    "5. summarize_lesson, start_adaptive_quiz, generate_quiz_batch, navigate_to_page là các HÀNH ĐỘNG riêng",
+    "   biệt với tìm kiếm thông tin - chỉ gọi khi học viên thực sự muốn vậy, không gọi kèm để \"cho chắc\".",
+    "   Không tự chọn start_adaptive_quiz hay generate_quiz_batch nếu học viên chưa nói rõ muốn quiz kiểu",
+    "   nào trong 2 kiểu đó - nếu mơ hồ, hỏi lại học viên thay vì đoán.",
     "6. QUAN TRỌNG: học viên KHÔNG nhìn thấy kết quả thô của tool. Khi tool (đặc biệt summarize_lesson,",
     "   search_lesson_content, get_page_content) trả về nội dung học viên cần đọc, PHẢI trình bày lại ĐẦY",
     "   ĐỦ nội dung đó trong câu trả lời cuối cùng - tuyệt đối KHÔNG trả lời kiểu \"đã tóm tắt/gửi ở trên\"",
@@ -91,6 +104,22 @@ export const REACT_AGENT_TOOLS = [
     name: "start_adaptive_quiz",
     description: "Bat dau phien tu kiem tra hieu thuc (quiz thich ung, hoi tung cau mot) cho bai giang dang mo va chuyen sang tab Quiz.",
     parameters: { type: "OBJECT", properties: {} }
+  },
+  {
+    name: "generate_quiz_batch",
+    description: "Tao ngay 1 bo quiz day du 8-10 cau (trac nghiem + tu luan) cho bai giang dang mo va chuyen sang tab Quiz, khac voi start_adaptive_quiz (hoi tung cau mot, thich ung).",
+    parameters: { type: "OBJECT", properties: {} }
+  },
+  {
+    name: "navigate_to_page",
+    description: "Chuyen man hinh slide dang hien thi sang dung 1 trang cu the de hoc vien xem lai truc tiep, khac voi get_page_content (chi lay noi dung de doc trong chat).",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        page: { type: "NUMBER", description: "So trang can chuyen man hinh toi." }
+      },
+      required: ["page"]
+    }
   }
 ];
 
@@ -289,6 +318,31 @@ export function buildVisionRegionPrompt(pageNum) {
     "2. Nếu ảnh mờ, bị cắt thiếu ngữ cảnh hoặc không đủ để giải thích chắc chắn, hãy nói rõ giới hạn thay vì đoán.",
     "3. Không suy đoán nội dung ngoài ảnh dựa trên tên bài học hoặc kiến thức nền.",
     "4. BẮT BUỘC kết thúc bằng trích dẫn [Trang " + pageNum + "]."
+  ].join("\n");
+}
+
+// Khác buildVisionRegionPrompt (ảnh CẮT TỪ đúng 1 trang slide, đã biết chắc pageNum): đây là
+// ảnh học viên TỰ CHỤP/TỰ CHỌN gửi trong chat (bài làm, ảnh chụp đề, ảnh ngoài đời...) - model
+// phải tự xác định ảnh có liên quan bài giảng đang mở hay không, không được giả định sẵn.
+export function buildImageChatPrompt(lessonTitle, slidesOutline, userQuery, imageCount) {
+  return [
+    "Bạn là Trợ giảng AI trên VLearn. Học viên vừa gửi " + imageCount + " ảnh đính kèm trong khung chat" +
+      (userQuery ? " kèm câu hỏi: \"" + userQuery + "\"" : " (không kèm câu hỏi chữ).") ,
+    "Bài giảng đang mở: " + (lessonTitle || "(chưa chọn bài)"),
+    "",
+    "Danh sách các trang trong bài giảng (chỉ tiêu đề, để bạn đối chiếu ảnh có liên quan trang nào không):",
+    slidesOutline || "(bài giảng chưa có trang nào)",
+    "",
+    "Nhiệm vụ:",
+    "1. Mô tả NGẮN GỌN từng ảnh đính kèm (những gì thực sự nhìn thấy).",
+    (imageCount > 1
+      ? "2. Vì có nhiều hơn 1 ảnh, hãy SO SÁNH các ảnh với nhau (giống/khác nhau ở điểm nào) nếu việc so sánh có ý nghĩa."
+      : "2. (Chỉ có 1 ảnh nên không cần bước so sánh.)"),
+    "3. Tự đánh giá: nội dung ảnh có LIÊN QUAN tới trang nào trong danh sách trên không.",
+    "   - Nếu CÓ liên quan: giải thích gắn với đúng trang đó, BẮT BUỘC kết thúc bằng trích dẫn [Trang N] của trang liên quan nhất.",
+    "   - Nếu KHÔNG liên quan tới bài giảng đang mở: nói rõ ảnh này không có trong nội dung bài giảng, vẫn có thể giải thích bằng kiến thức nền nhưng phải gắn nhãn rõ đây là kiến thức nền ngoài slide, KHÔNG được bịa trích dẫn [Trang N].",
+    "4. Nếu học viên có kèm câu hỏi chữ, trả lời đúng trọng tâm câu hỏi đó dựa trên ảnh.",
+    "5. Nếu ảnh mờ, thiếu ngữ cảnh hoặc không đủ để kết luận chắc chắn, hãy nói rõ giới hạn thay vì đoán."
   ].join("\n");
 }
 

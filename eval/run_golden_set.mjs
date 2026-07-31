@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { VLEARN_LESSONS } from '../src/data.js';
+import { VLEARN_LESSONS } from '../codebase/src/data.js';
 import {
   createHybridOfflineAnswer,
   createOfflineAnswer,
@@ -11,7 +11,7 @@ import {
   normalizeText,
   validateGroundedResponse,
   validateQuizData
-} from '../src/grounding.mjs';
+} from '../codebase/src/grounding.mjs';
 
 const goldenSet = JSON.parse(
   await readFile(new URL('./golden_set.json', import.meta.url), 'utf8')

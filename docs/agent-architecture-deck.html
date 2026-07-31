@@ -1,0 +1,670 @@
+<title>VLearn Grounding Tutor — Kiến trúc &amp; Quyết định</title>
+<style>
+  :root {
+    --paper: #f1efe6;
+    --paper-raised: #e9e6d9;
+    --ink: #1d1c17;
+    --ink-soft: #4a4739;
+    --line: #d6d0bd;
+    --agent: #4b3fd6;
+    --agent-soft: #ece9fb;
+    --verified: #1f7a54;
+    --verified-soft: #e2efe6;
+    --external: #b06a1f;
+    --external-soft: #f5ead9;
+    --blocked: #a53d3d;
+    --blocked-soft: #f5e2df;
+    --shadow: 0 1px 2px rgba(29,28,23,0.06), 0 8px 24px rgba(29,28,23,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #15161a;
+      --paper-raised: #1d1f25;
+      --ink: #ece9e0;
+      --ink-soft: #a8a496;
+      --line: rgba(236,233,224,0.14);
+      --agent: #9a92ff;
+      --agent-soft: rgba(154,146,255,0.14);
+      --verified: #4fbf8f;
+      --verified-soft: rgba(79,191,143,0.14);
+      --external: #e0a355;
+      --external-soft: rgba(224,163,85,0.14);
+      --blocked: #e28080;
+      --blocked-soft: rgba(226,128,128,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #15161a; --paper-raised: #1d1f25; --ink: #ece9e0; --ink-soft: #a8a496;
+    --line: rgba(236,233,224,0.14); --agent: #9a92ff; --agent-soft: rgba(154,146,255,0.14);
+    --verified: #4fbf8f; --verified-soft: rgba(79,191,143,0.14);
+    --external: #e0a355; --external-soft: rgba(224,163,85,0.14);
+    --blocked: #e28080; --blocked-soft: rgba(226,128,128,0.14);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 30px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #f1efe6; --paper-raised: #e9e6d9; --ink: #1d1c17; --ink-soft: #4a4739;
+    --line: #d6d0bd; --agent: #4b3fd6; --agent-soft: #ece9fb;
+    --verified: #1f7a54; --verified-soft: #e2efe6;
+    --external: #b06a1f; --external-soft: #f5ead9;
+    --blocked: #a53d3d; --blocked-soft: #f5e2df;
+    --shadow: 0 1px 2px rgba(29,28,23,0.06), 0 8px 24px rgba(29,28,23,0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+  }
+  /* Georgia/Palatino thiếu glyph cho nguyên âm tiếng Việt 2 dấu chồng (ằ, ố, ệ...) -
+     trình duyệt phải mượn dấu từ font khác nên bị lệch. Dùng font hệ thống có phủ
+     tiếng Việt đầy đủ, giữ độ nổi bật bằng weight/spacing thay vì đổi họ chữ. */
+  .serif {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .mono {
+    font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  h1, h2, h3, p { margin: 0; }
+  h1, h2, h3 { text-wrap: balance; }
+
+  /* ---------- deck shell ---------- */
+  .deck-shell {
+    position: relative;
+    height: 100dvh;
+    width: 100%;
+    display: flex;
+  }
+
+  .nav-rail {
+    flex: 0 0 auto;
+    width: 15.5rem;
+    padding: 1.75rem 1rem 1.75rem 1.75rem;
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    overflow-y: auto;
+  }
+  .nav-rail .brand {
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-rail .brand strong { display: block; color: var(--ink); font-size: 0.78rem; letter-spacing: 0.02em; margin-top: 0.25rem; }
+  .nav-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-size: 0.82rem;
+    font-family: inherit;
+  }
+  .nav-item .idx { font-size: 0.68rem; opacity: 0.7; min-width: 1.1rem; }
+  .nav-item:hover { background: var(--paper-raised); color: var(--ink); }
+  .nav-item[aria-current="true"] {
+    background: var(--agent-soft);
+    color: var(--agent);
+    font-weight: 600;
+  }
+  .nav-item:focus-visible { outline: 2px solid var(--agent); outline-offset: 1px; }
+
+  .deck {
+    position: relative;
+    flex: 1 1 auto;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 3.4rem 4.2rem 2.6rem;
+    opacity: 0;
+    transform: translateY(14px);
+    pointer-events: none;
+    transition: opacity 0.38s ease, transform 0.38s ease;
+    overflow-y: auto;
+  }
+  .slide.is-active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slide { transition: opacity 0.01s linear; transform: none; }
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.9rem;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.6rem;
+    height: 2px;
+    background: var(--rule, var(--agent));
+    display: inline-block;
+  }
+  .slide-title {
+    font-size: clamp(1.7rem, 2.7vw, 2.5rem);
+    line-height: 1.15;
+    font-weight: 500;
+    max-width: 40rem;
+  }
+  .lede {
+    margin-top: 0.85rem;
+    max-width: 42rem;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+  .slide-body { margin-top: 1.9rem; flex: 1 1 auto; min-height: 0; }
+
+  .source {
+    margin-top: auto;
+    padding-top: 1.1rem;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+  }
+  .source::before { content: "Nguồn — "; opacity: 0.75; }
+
+  /* ---------- reusable components ---------- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.16rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.verified { background: var(--verified-soft); color: var(--verified); }
+  .badge.external { background: var(--external-soft); color: var(--external); }
+  .badge.blocked { background: var(--blocked-soft); color: var(--blocked); }
+  .badge.agent { background: var(--agent-soft); color: var(--agent); }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+  .stat {
+    background: var(--paper);
+    padding: 1.1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .stat .num { font-size: 1.9rem; font-family: Georgia, serif; }
+  .stat .num small { font-size: 1rem; color: var(--ink-soft); font-family: inherit; }
+  .stat .label { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.4; }
+
+  .timeline { display: flex; flex-direction: column; }
+  .cp-row {
+    display: grid;
+    grid-template-columns: 3.4rem 8.5rem 1fr 9.5rem;
+    gap: 1.2rem;
+    align-items: start;
+    padding: 0.95rem 0;
+    border-top: 1px solid var(--line);
+  }
+  .cp-row:last-child { border-bottom: 1px solid var(--line); }
+  .cp-row .cp-idx { font-family: Georgia, serif; font-size: 1.4rem; color: var(--ink-soft); }
+  .cp-row .cp-name { font-weight: 600; padding-top: 0.15rem; }
+  .cp-row .cp-desc { font-size: 0.88rem; color: var(--ink-soft); line-height: 1.5; padding-top: 0.2rem; }
+  .cp-row .cp-status { text-align: right; padding-top: 0.15rem; }
+
+  .impact-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  .impact-table th, .impact-table td { text-align: left; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .impact-table th { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  .impact-table tr.chosen td { background: var(--verified-soft); }
+  .impact-table tr.chosen td:first-child { border-left: 3px solid var(--verified); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+
+  .two-col { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2.6rem; height: 100%; }
+  .goal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+  .goal-list li { display: flex; gap: 0.6rem; font-size: 0.9rem; line-height: 1.5; }
+  .goal-list.no li::before { content: "✕"; color: var(--blocked); font-weight: 700; }
+  .goal-list.yes li::before { content: "✓"; color: var(--verified); font-weight: 700; }
+
+  .mermaid-card {
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    padding: 1rem 1.2rem 0.6rem;
+    overflow-x: auto;
+  }
+
+  .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .tool-card { background: var(--paper); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 9.5rem; }
+  .tool-card .fn { font-size: 0.86rem; color: var(--agent); }
+  .tool-card p { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.45; }
+
+  .flow-list { display: flex; flex-direction: column; gap: 0; counter-reset: flow; }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: 0.9rem;
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--line);
+    font-size: 0.86rem;
+    align-items: start;
+  }
+  .flow-step:first-child { border-top: none; }
+  .flow-step .n { counter-increment: flow; font-family: Georgia, serif; color: var(--ink-soft); }
+  .flow-step .n::before { content: counter(flow, decimal-leading-zero); }
+  .flow-step code { background: var(--paper-raised); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.82rem; }
+
+  .principle-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .principle-card { background: var(--paper); padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .principle-card .tag { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--agent); font-weight: 700; }
+  .principle-card p { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; }
+
+  .quote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+  .quote-card { border-left: 3px solid var(--verified); padding: 0.2rem 0 0.2rem 1rem; }
+  .quote-card q { display: block; font-size: 0.86rem; line-height: 1.55; font-style: italic; }
+  .quote-card cite { display: block; margin-top: 0.4rem; font-size: 0.74rem; font-style: normal; color: var(--ink-soft); }
+
+  .change-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+  .change-list li { font-size: 0.87rem; line-height: 1.5; padding-left: 1.1rem; position: relative; }
+  .change-list li::before { content: "→"; position: absolute; left: 0; color: var(--agent); }
+
+  /* ---------- controls ---------- */
+  .controls {
+    position: absolute;
+    right: 4.2rem;
+    bottom: 1.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    z-index: 5;
+  }
+  .controls button {
+    font-family: inherit;
+    font-size: 0.8rem;
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 0.45rem 0.85rem;
+    border-radius: 7px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .controls button:disabled { opacity: 0.35; cursor: default; }
+  .controls button:focus-visible { outline: 2px solid var(--agent); outline-offset: 1px; }
+  .counter { font-size: 0.78rem; color: var(--ink-soft); min-width: 3.4rem; text-align: center; }
+
+  .progress-bar { position: absolute; left: 15.5rem; right: 0; top: 0; height: 2px; background: var(--line); z-index: 5; }
+  .progress-bar > div { height: 100%; background: var(--agent); transition: width 0.35s ease; }
+
+  ::selection { background: var(--agent-soft); color: var(--agent); }
+
+  @media (max-width: 900px) {
+    .nav-rail { display: none; }
+    .progress-bar { left: 0; }
+    .slide { padding: 2.4rem 1.6rem 2rem; }
+    .two-col { grid-template-columns: 1fr; }
+    .stat-grid, .tool-grid, .principle-grid, .quote-grid { grid-template-columns: 1fr; }
+    .controls { right: 1.6rem; }
+  }
+</style>
+
+<div class="deck-shell">
+  <div class="progress-bar"><div id="progressFill" style="width:10%"></div></div>
+
+  <nav class="nav-rail" aria-label="Điều hướng slide">
+    <div class="brand">Nhóm G17 · Zone E403
+      <strong>VLearn Grounding Tutor</strong>
+    </div>
+    <button class="nav-item" data-goto="0"><span class="idx mono">00</span><span>Mở đầu</span></button>
+    <button class="nav-item" data-goto="1"><span class="idx mono">01</span><span>6 chặng checkpoint</span></button>
+    <button class="nav-item" data-goto="2"><span class="idx mono">02</span><span>Vấn đề &amp; bằng chứng</span></button>
+    <button class="nav-item" data-goto="3"><span class="idx mono">03</span><span>Vì sao chọn giải pháp này</span></button>
+    <button class="nav-item" data-goto="4"><span class="idx mono">04</span><span>Kiến trúc hệ thống</span></button>
+    <button class="nav-item" data-goto="5"><span class="idx mono">05</span><span>Bộ công cụ của Agent</span></button>
+    <button class="nav-item" data-goto="6"><span class="idx mono">06</span><span>Luồng xử lý 1 câu hỏi</span></button>
+    <button class="nav-item" data-goto="7"><span class="idx mono">07</span><span>Vì sao thiết kế vậy</span></button>
+    <button class="nav-item" data-goto="8"><span class="idx mono">08</span><span>Kết quả &amp; rủi ro</span></button>
+    <button class="nav-item" data-goto="9"><span class="idx mono">09</span><span>Validation &amp; tiếp theo</span></button>
+  </nav>
+
+  <main class="deck" id="deck">
+
+    <!-- 00 COVER -->
+    <section class="slide" data-index="0">
+      <div style="margin-top: auto;">
+        <div class="eyebrow" style="--rule: var(--agent);">Nhóm G17 · Zone E403 · Khóa 3</div>
+        <h1 class="slide-title serif" style="font-size: clamp(2.1rem, 4.4vw, 3.6rem); max-width: 46rem;">VLearn Grounding Tutor &amp;<br/>End-of-Session Quiz Agent</h1>
+        <p class="lede" style="max-width: 34rem;">Học viên tự kiểm tra 80% kiến thức cốt lõi của một buổi học trong 3 phút — mọi câu trả lời và câu hỏi quiz đều truy được về đúng trang slide, không đoán.</p>
+        <div style="display:flex; gap:0.6rem; margin-top: 1.6rem; flex-wrap: wrap;">
+          <span class="badge verified">Trích dẫn verified [Trang N]</span>
+          <span class="badge agent">Agent tool-calling thật</span>
+          <span class="badge external">Kiến thức nền ngoài slide — có nhãn riêng</span>
+        </div>
+      </div>
+      <p class="source" style="margin-top: 2.4rem;">spec.md · README.md · dùng cho buổi dry-run nội bộ trước CP6</p>
+    </section>
+
+    <!-- 01 CHECKPOINTS -->
+    <section class="slide" data-index="1">
+      <div class="eyebrow" style="--rule: var(--agent);">Quy trình</div>
+      <h2 class="slide-title serif">Sáu chặng, mỗi chặng khoá một quyết định</h2>
+      <p class="lede">Không phải cuộc thi code — mỗi checkpoint buộc nhóm chốt một lớp bằng chứng trước khi đi tiếp, và spec.md khoá cứng lúc 23:59 ngày 1.</p>
+      <div class="slide-body timeline">
+        <div class="cp-row">
+          <div class="cp-idx mono">01</div>
+          <div class="cp-name">Canvas 7 dòng</div>
+          <div class="cp-desc">Chốt lát cắt MỘT CÂU, bằng chứng ban đầu (mining + khảo sát), phân công 5 người.</div>
+          <div class="cp-status"><span class="badge verified">Xong</span></div>
+        </div>
+        <div class="cp-row">
+          <div class="cp-idx mono">02</div>
+          <div class="cp-name">Bấm được</div>
+          <div class="cp-desc">Flow chính bấm hết được trên prototype + commit đầu tiên lên repo.</div>
+          <div class="cp-status"><span class="badge verified">Xong</span></div>
+        </div>
+        <div class="cp-row">
+          <div class="cp-idx mono">03</div>
+          <div class="cp-name">AI thật + đo lượt đầu</div>
+          <div class="cp-desc">Gọi AI thật ở quyết định trung tâm, golden set ≥20 case, bảng kết quả lượt 1.</div>
+          <div class="cp-status"><span class="badge verified">Xong</span></div>
+        </div>
+        <div class="cp-row">
+          <div class="cp-idx mono">04</div>
+          <div class="cp-name">Chốt tiến độ</div>
+          <div class="cp-desc">spec.md commit hạn cứng 23:59 N1 — quality bar bằng số, giữ nguyên từ đây.</div>
+          <div class="cp-status"><span class="badge verified">Xong</span></div>
+        </div>
+        <div class="cp-row">
+          <div class="cp-idx mono">05</div>
+          <div class="cp-name">Validation + dry run</div>
+          <div class="cp-desc">≥5 người ngoài nhóm test thật, changelog trỏ đúng feedback, dry run có bấm giờ.</div>
+          <div class="cp-status"><span class="badge verified">5 feedback thật ✓</span></div>
+        </div>
+        <div class="cp-row">
+          <div class="cp-idx mono">06</div>
+          <div class="cp-name">Demo</div>
+          <div class="cp-desc">5' trình bày kèm case lỗi live + % so với quality bar, 5' Q&amp;A ngẫu nhiên.</div>
+          <div class="cp-status"><span class="badge agent">Sắp tới</span></div>
+        </div>
+      </div>
+      <p class="source">README.md · 04-rubric.md — checklist xác minh 6 mốc</p>
+    </section>
+
+    <!-- 02 PROBLEM & EVIDENCE -->
+    <section class="slide" data-index="2">
+      <div class="eyebrow" style="--rule: var(--external);">Vấn đề</div>
+      <h2 class="slide-title serif">Học viên rời buổi học mà không biết mình đã thủng ở đâu</h2>
+      <p class="lede">Job cốt lõi: <em>tự kiểm tra và xác nhận hiểu 80% kiến thức trong 3 phút, không bị ngợp bởi slide/video dài.</em> Mining 1.261 turn chatlog VLearn thật cho thấy khoảng trống này rõ ràng.</p>
+      <div class="slide-body">
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="num tnum">46,2<small>%</small></div>
+            <div class="label">582/1.261 turn AI Tutor trả lời không có trích dẫn nào</div>
+          </div>
+          <div class="stat">
+            <div class="num tnum">85,2<small>%</small></div>
+            <div class="label">1.074/1.261 turn AI chỉ xả "bức tường chữ" lý thuyết suông</div>
+          </div>
+          <div class="stat">
+            <div class="num tnum">99,8<small>%</small></div>
+            <div class="label">1.258/1.261 turn AI không chủ động hỏi lại để kiểm tra mức hiểu</div>
+          </div>
+          <div class="stat">
+            <div class="num tnum">9<small>/1.261</small></div>
+            <div class="label">turn từ 7/369 học viên tự xin AI tạo quiz — dù tính năng chưa tồn tại</div>
+          </div>
+        </div>
+        <p style="margin-top: 1.3rem; font-size: 0.88rem; color: var(--ink-soft); max-width: 40rem;">Song song, khảo sát 20 học viên trong lớp xác nhận nhu cầu có bộ Quiz tự luyện 3 phút cuối buổi — đường B (đếm được) cho thấy vấn đề tồn tại, đường A (khảo sát) cho thấy người dùng muốn giải quyết.</p>
+      </div>
+      <p class="source">data/vlearn-pack/chatlog/ (1.261 turn, ẩn danh) · spec.md §1 · VLearn_Practice_Coach_Canvas.md §4</p>
+    </section>
+
+    <!-- 03 WHY THIS SOLUTION -->
+    <section class="slide" data-index="3">
+      <div class="eyebrow" style="--rule: var(--verified);">Quyết định</div>
+      <h2 class="slide-title serif">3 ứng viên, chọn 1 bằng số — không bằng cảm tính</h2>
+      <div class="slide-body two-col">
+        <div>
+          <div class="table-wrap">
+            <table class="impact-table">
+              <thead><tr><th>Ứng viên</th><th>Bao nhiêu người</th><th>Tần suất</th><th>Tốn gì mỗi lần</th></tr></thead>
+              <tbody>
+                <tr class="chosen"><td><strong>Grounding Tutor &amp; Quiz Agent</strong></td><td>~1.000 học viên</td><td>1 lần/buổi (5 buổi/tuần)</td><td>60–90' mò lại slide/video khi hổng kiến thức</td></tr>
+                <tr><td>AI Tutor Socratic Chat</td><td>~300 học viên chat</td><td>Hàng ngày</td><td>5–10' đọc bức tường chữ</td></tr>
+                <tr><td>Instructor Misconception Dashboard</td><td>~5 giảng viên/TA</td><td>1 lần/sau buổi</td><td>1–2h đọc chatlog</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--ink-soft); line-height: 1.55;">Loại 2 &amp; 3: quy mô người thụ hưởng nhỏ hơn nhiều so với 1.000 học viên, và thiếu tính chủ động đánh giá kiến thức ngay cuối buổi. Chọn ứng viên 1 vì tác động trực tiếp lớn nhất + build 5h là khả thi.</p>
+        </div>
+        <div>
+          <p style="font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.7rem;">3 điều nhóm cố tình không build</p>
+          <ul class="goal-list no">
+            <li>Không tạo bài quiz tính điểm chính thức cho môn học</li>
+            <li>Không làm hệ thống điểm danh tự động</li>
+            <li>Không thay thế kênh hỗ trợ TA trên Discord</li>
+          </ul>
+        </div>
+      </div>
+      <p class="source">spec.md §2 — Impact &amp; Quyết Định Chọn, §4 Non-goals</p>
+    </section>
+
+    <!-- 04 ARCHITECTURE -->
+    <section class="slide" data-index="4">
+      <div class="eyebrow" style="--rule: var(--agent);">Hệ thống</div>
+      <h2 class="slide-title serif">Key sống ở server, agent sống ở trình duyệt</h2>
+      <p class="lede">Frontend chỉ điều phối UI và gọi qua backend — không có API key nào rời trạm máy khách.</p>
+      <div class="slide-body">
+        <div class="mermaid-card">
+<pre class="mermaid">
+flowchart LR
+  U["Học viên<br/>trình duyệt"] -->|"bôi đen / hỏi / bấm Quiz"| FE["app.js<br/>điều phối UI"]
+  FE -->|"POST /api/llm/generate<br/>POST /api/llm/agent-turn"| BE["FastAPI<br/>server/main.py"]
+  BE --> PR["providers.py"]
+  PR -->|"key chỉ ở server"| LLM["Gemini / OpenRouter"]
+  FE -->|"POST /api/embed/search"| EMB["embed.py"]
+  EMB --> VDB[("SQLite<br/>db.py")]
+  EMB -.->|"lỗi / hết quota"| KW["retrieveRelevantSlides<br/>keyword fallback"]
+  FE -->|"POST /api/logs/*"| LOGS["logs.py"] --> VDB
+</pre>
+        </div>
+        <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--ink-soft); max-width: 40rem;">Vector search qua embedding Gemini được cache trong SQLite theo fingerprint của bộ slide; nếu embedding lỗi hoặc hết quota, hệ thống rơi về tìm theo từ khoá thay vì trả lỗi — không có nhánh nào làm search "câm" hoàn toàn.</p>
+      </div>
+      <p class="source">codebase/server/main.py, providers.py, routers/embed.py · codebase/src/grounding.mjs</p>
+    </section>
+
+    <!-- 05 TOOLS -->
+    <section class="slide" data-index="5">
+      <div class="eyebrow" style="--rule: var(--agent);">Agent</div>
+      <h2 class="slide-title serif">6 công cụ — model tự chọn, tối đa 4 lượt gọi</h2>
+      <p class="lede">Agent Chat dùng function-calling thật của Gemini: model tự quyết định gọi tool nào, mấy lần, trước khi trả lời — không phải kịch bản if/else cứng.</p>
+      <div class="slide-body">
+        <div class="tool-grid">
+          <div class="tool-card"><span class="badge agent">Tìm kiếm</span><div class="fn mono">search_lesson_content(query)</div><p>Tìm đoạn slide/transcript liên quan theo từ khoá khi chưa chắc thông tin nằm ở trang nào.</p></div>
+          <div class="tool-card"><span class="badge agent">Đọc nội dung</span><div class="fn mono">get_page_content(page)</div><p>Lấy toàn bộ nội dung một trang cụ thể khi đã biết chính xác số trang.</p></div>
+          <div class="tool-card"><span class="badge agent">Đọc nội dung</span><div class="fn mono">summarize_lesson()</div><p>Tóm tắt toàn bộ slide bài giảng đang mở khi học viên muốn ôn nhanh cả bài.</p></div>
+          <div class="tool-card"><span class="badge external">Hành động UI</span><div class="fn mono">start_adaptive_quiz()</div><p>Bắt đầu quiz thích ứng — hỏi từng câu một, sai thì hỏi lại câu dễ hơn.</p></div>
+          <div class="tool-card"><span class="badge external">Hành động UI</span><div class="fn mono">generate_quiz_batch()</div><p>Tạo ngay bộ quiz đầy đủ 8–10 câu (trắc nghiệm + tự luận) cùng lúc.</p></div>
+          <div class="tool-card"><span class="badge external">Hành động UI</span><div class="fn mono">navigate_to_page(page)</div><p>Chuyển màn hình slide sang đúng trang để học viên xem lại trực tiếp — khác get_page_content vì không trả nội dung vào chat.</p></div>
+        </div>
+      </div>
+      <p class="source">codebase/src/prompts.js — REACT_AGENT_TOOLS · MAX_AGENT_TOOL_CALLS = 4 (app.js)</p>
+    </section>
+
+    <!-- 06 FLOW -->
+    <section class="slide" data-index="6">
+      <div class="eyebrow" style="--rule: var(--agent);">Luồng xử lý</div>
+      <h2 class="slide-title serif">Một câu hỏi đi qua những function nào</h2>
+      <div class="slide-body two-col">
+        <div class="flow-list">
+          <div class="flow-step"><div class="n mono"></div><div><code>handleUserChat()</code> nhận câu hỏi từ khung chat.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div><code>detectGuardrailViolation()</code> chặn ngay nếu là prompt injection / đòi giải bài nộp điểm.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div><code>runReActChat()</code> mở vòng lặp tối đa 4 bước với <code>callGeminiAgentTurn()</code>.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div>Model chọn 1 trong 6 tool → khớp bằng <code>execute*()</code> tương ứng, vd <code>search_lesson_content</code> → <code>searchSlidesViaBackend()</code>.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div>Kết quả tool hiện "dấu vết" cho học viên thấy (<code>appendTrace()</code>) rồi nạp lại làm <code>functionResponse</code>, lặp bước 3.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div>Model trả lời bằng text → <code>validateHybridResponse()</code> kiểm citation: trang có tồn tại, có nằm trong trang agent vừa tra cứu, nội dung có khớp nguồn.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div>Citation sai → gỡ + hạ nhãn "Kiến thức nền ngoài slide", KHÔNG huỷ cả câu trả lời hữu ích.</div></div>
+          <div class="flow-step"><div class="n mono"></div><div><code>logInteraction()</code> ghi lại vào SQLite làm bằng chứng cho eval/validation sau này.</div></div>
+        </div>
+        <div class="mermaid-card" style="align-self: center;">
+<pre class="mermaid">
+flowchart TD
+  A["Câu hỏi học viên"] --> B{"Guardrail vi phạm?"}
+  B -->|"có"| X["Từ chối khéo"]
+  B -->|"không"| C["Agent turn<br/>(≤4 bước)"]
+  C --> D{"Model chọn gì?"}
+  D -->|"gọi tool"| E["Chạy 1/6 tool"]
+  E --> C
+  D -->|"trả lời"| F["Kiểm citation"]
+  F -->|"hợp lệ"| G["Trang N verified"]
+  F -->|"sai"| H["Hạ nhãn ngoài slide"]
+</pre>
+        </div>
+      </div>
+      <p class="source">codebase/src/app.js — runReActChatUnsafe(), validateHybridResponse() trong grounding.mjs</p>
+    </section>
+
+    <!-- 07 WHY DESIGNED THIS WAY -->
+    <section class="slide" data-index="7">
+      <div class="eyebrow" style="--rule: var(--verified);">Nguyên tắc</div>
+      <h2 class="slide-title serif">Sai kiến thức đắt hơn UX xấu — nên automation dừng ở Augment/Conditional</h2>
+      <p class="lede">Nếu agent tạo quiz hoặc chấm sai, học viên củng cố kiến thức sai ngay lúc đang tin tưởng hệ thống nhất. Vì vậy AI không bao giờ toàn quyền quyết định — luôn kèm trích dẫn để học viên tự kiểm chứng.</p>
+      <div class="slide-body">
+        <div class="principle-grid">
+          <div class="principle-card"><div class="tag">HAX G2 · hiệu năng rõ ràng</div><p>Mọi lần agent gọi tool đều hiện "🔧 Tool: …" ngay trong khung chat — học viên luôn thấy AI đang tra cứu gì, không phải hộp đen.</p></div>
+          <div class="principle-card"><div class="tag">HAX G10 · thu hẹp khi nghi ngờ</div><p>System prompt bắt buộc gọi search_lesson_content trước khi trả lời bất kỳ câu hỏi kiến thức nào — kể cả khi model "tự tin" đã biết đáp án.</p></div>
+          <div class="principle-card"><div class="tag">HAX G11 · giải thích vì sao</div><p>validateHybridResponse gắn rõ [Trang N] verified hoặc nhãn "Kiến thức nền ngoài slide" cho từng phần câu trả lời.</p></div>
+          <div class="principle-card"><div class="tag">HAX G9 · sửa dễ dàng</div><p>Nút "Thử lại câu tự luận" và điều hướng lại đúng trang trích dẫn nằm ngay dưới mỗi phản hồi.</p></div>
+        </div>
+        <p style="margin-top: 1.1rem; font-size: 0.85rem; color: var(--ink-soft); max-width: 42rem;">Quyết định "hạ nhãn thay vì loại bỏ" (slide 06) từng đổi ngược lại một lần trong quá trình build: bản đầu loại bỏ toàn bộ câu trả lời khi citation sai, khiến chatbot trả lời cứng nhắc và mất nội dung hữu ích — nhóm sửa lại theo hướng hybrid hiện tại.</p>
+      </div>
+      <p class="source">spec.md §4b · §9 Changelog (đổi 15:10 ngày 1)</p>
+    </section>
+
+    <!-- 08 RESULTS -->
+    <section class="slide" data-index="8">
+      <div class="eyebrow" style="--rule: var(--verified);">Kết quả đo</div>
+      <h2 class="slide-title serif">Quality bar ≥85% — live Gemini đạt 88,2%</h2>
+      <div class="slide-body two-col">
+        <div>
+          <div class="stat-grid" style="grid-template-columns: repeat(2,1fr);">
+            <div class="stat"><div class="num tnum">20<small>/20</small></div><div class="label">Golden set — lượt offline deterministic (rule-based, không gọi AI)</div></div>
+            <div class="stat"><div class="num tnum">15<small>/17</small></div><div class="label">Lượt live gọi thật Gemini — 88,2%, vượt bar ≥85%</div></div>
+          </div>
+          <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--ink-soft); line-height: 1.55;">Golden set 20 case: 10 case bài học thường, 5 case tự luận "gần đúng nhưng thiếu ý cốt lõi", 5 case adversarial (slide ít chữ/nhiều hình). 3 case guardrail không gọi AI theo đúng thiết kế, không tính vào tỷ lệ live.</p>
+        </div>
+        <div>
+          <p style="font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.7rem;">2 case chưa qua — vì sao</p>
+          <ul class="goal-list no">
+            <li><strong>TC04 (Dogfooding):</strong> trích dẫn đúng Trang 19, nội dung đúng, nhưng không nhắc đúng từ khoá "Jira/Slack" mà golden set yêu cầu khớp.</li>
+            <li><strong>TC05 (Five Whys):</strong> dùng cụm "nguyên nhân gốc rễ" thay vì đúng cụm "nguyên nhân thật" — nội dung và trích dẫn Trang 4 đều đúng.</li>
+          </ul>
+          <p style="margin-top: 0.8rem; font-size: 0.82rem; color: var(--ink-soft);">Cả hai là lỗi chấm khớp từ khoá quá cứng nhắc trước văn phong tự nhiên của model thật — không phải lỗi bịa nội dung hay trích dẫn sai.</p>
+        </div>
+      </div>
+      <p class="source">eval/eval_results.json · eval/eval_results_live.json · spec.md §7</p>
+    </section>
+
+    <!-- 09 VALIDATION & NEXT -->
+    <section class="slide" data-index="9">
+      <div class="eyebrow" style="--rule: var(--external);">Người dùng thật</div>
+      <h2 class="slide-title serif">5 người ngoài nhóm test thật, 3 thay đổi đi thẳng vào prototype</h2>
+      <div class="slide-body">
+        <div class="quote-grid">
+          <div class="quote-card"><q>Thích nhất là làm sai câu nào AI chỉ ngay [Trang N] để mình mở lại xem đúng đoạn đó. Nhưng kiến thức bổ sung nên có nhãn phân biệt rõ hơn.</q><cite>Nguyễn Văn An — học viên K3, willing user</cite></div>
+          <div class="quote-card"><q>Verifier hoạt động tốt, phát hiện citation sai thì tự gỡ ra và hạ nhãn kiến thức nền chứ không loại bỏ câu trả lời hữu ích.</q><cite>Phạm Thái Sơn — học viên K3</cite></div>
+        </div>
+        <ul class="change-list" style="margin-top: 1.4rem;">
+          <li>Tách nhãn/màu rõ ràng giữa "Trích dẫn bài giảng [Trang N]" và "Kiến thức nền ngoài slide" (feedback #1, #3).</li>
+          <li>Verifier chỉ gỡ citation sai và hạ nhãn, không loại bỏ toàn bộ câu trả lời (feedback #5).</li>
+          <li>Dãn khoảng cách UI Quiz + thêm đồng hồ đếm ngược 3 phút (feedback #2, #4).</li>
+          <li><strong>Giữ nguyên</strong> 8–10 câu quiz dù có đề xuất tăng lên 15–20 — JTBD cốt lõi là kiểm tra nhanh 3 phút cuối buổi.</li>
+        </ul>
+      </div>
+      <p class="source">validation/feedback-log.md · validation/changelog.md</p>
+    </section>
+
+  </main>
+
+  <div class="controls">
+    <button id="prevBtn" type="button">← Trước</button>
+    <span class="counter mono tnum" id="counter">01 / 10</span>
+    <button id="nextBtn" type="button">Tiếp →</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+    var navItems = Array.prototype.slice.call(document.querySelectorAll('.nav-item'));
+    var counter = document.getElementById('counter');
+    var progressFill = document.getElementById('progressFill');
+    var prevBtn = document.getElementById('prevBtn');
+    var nextBtn = document.getElementById('nextBtn');
+    var current = 0;
+    var total = slides.length;
+
+    function render() {
+      slides.forEach(function (s, i) {
+        s.classList.toggle('is-active', i === current);
+      });
+      navItems.forEach(function (b, i) {
+        b.setAttribute('aria-current', i === current ? 'true' : 'false');
+      });
+      counter.textContent = String(current + 1).padStart(2, '0') + ' / ' + String(total).padStart(2, '0');
+      progressFill.style.width = (((current + 1) / total) * 100) + '%';
+      prevBtn.disabled = current === 0;
+      nextBtn.disabled = current === total - 1;
+    }
+
+    function goTo(i) {
+      current = Math.max(0, Math.min(total - 1, i));
+      render();
+    }
+
+    prevBtn.addEventListener('click', function () { goTo(current - 1); });
+    nextBtn.addEventListener('click', function () { goTo(current + 1); });
+    navItems.forEach(function (b) {
+      b.addEventListener('click', function () { goTo(parseInt(b.dataset.goto, 10)); });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') { goTo(current + 1); }
+      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { goTo(current - 1); }
+      else if (e.key === 'Home') { goTo(0); }
+      else if (e.key === 'End') { goTo(total - 1); }
+    });
+
+    render();
+  })();
+</script>

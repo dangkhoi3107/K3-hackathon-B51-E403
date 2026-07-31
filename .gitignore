@@ -1,5 +1,26 @@
 .DS_Store
 node_modules/
-*.env
 __pycache__/
 *.pyc
+*.log
+
+# Secrets - key that thuc su nam trong .env, khong bao gio commit
+.env
+.env.*
+!.env.example
+
+# Key/credential file khac co the vo tinh tao ra
+*.key
+*.pem
+credentials.json
+secrets.json
+
+# Database local (chua vector cache + log tuong tac that cua nguoi test)
+*.db
+*.sqlite3
+codebase/server/vlearn.db
+
+# Virtualenv/conda env neu ai do tao ngay trong repo
+.venv/
+venv/
+env/

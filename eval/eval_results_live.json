@@ -1,0 +1,132 @@
+{
+  "evaluator": "live-gemini-v1",
+  "executed_at": "2026-07-30T21:39:13.162Z",
+  "backend_origin": "http://localhost:8787",
+  "scope": "Gọi THẬT Gemini qua backend đang chạy cho mọi category có gọi AI trong production; category chỉ chạy validator/guardrail (không gọi AI theo thiết kế) được đánh dấu riêng, không tính vào pass_rate.",
+  "total_scored": 17,
+  "passed": 15,
+  "failed": 2,
+  "pass_rate": 88.2,
+  "results": [
+    {
+      "id": "TC01",
+      "category": "standard_grounded_qa",
+      "passed": true,
+      "observed": "Chào bạn, rất vui được đồng hành cùng bạn trong bài học này! Để hình dung về mối quan hệ giữa AI, Machine Learning, Deep Learning và Generative AI, hãy tưởng tượng chúng như những **vòng tròn đồng tâm** thu nhỏ dần, nơi mỗi lớp sau là một kỹ thuật chuyên sâu hơn nằm trong lớp trước.\n\n**Trong bài giảng**\n*   **AI (Trí tuệ nhân tạo):** Là khái niệm bao quát nhất, mô tả bất kỳ hệ thống nào có khả năng mô phỏng trí thông minh của con người [Trang 5].\n*   **Machine Learning (Học máy):** Là một tập con của AI. Thay vì lập trình cứng nhắc bằng các quy tắc \"nếu... thì...\" (if-else), máy tính sẽ tự học các quy luật từ dữ liệu đầu vào [Trang 5].\n*   **Deep Learning (Học sâu):** Là một nhánh nâng cao của Machine Learning, sử dụng các mạng neuron nhân tạo nhiều tầng để tự động trích xuất các đặc trưng phức tạp từ dữ liệu [Trang 5, T04-030].\n*   **Generative AI (AI tạo sinh):** Là lớp trong cùng, tập trung vào khả năng \"sáng tạo\" ra nội dung mới (văn bản, hình ảnh, âm thanh) thay vì chỉ phân tích hay dự đoán dữ liệu [Trang 5].\n\n**Kiến thức nền ngoài slide**\nĐể dễ hình dung, bạn có thể xem xét ví dụ về một ứng dụng lọc email rác:\n*   **AI:** Là hệ thống tổng thể giúp người dùng quản lý email hiệu quả.\n*   **Machine Learning:** Bạn cung cấp cho máy hàng nghìn email đã gắn nhãn \"rác\" hoặc \"không rác\". Máy sẽ tự tìm ra các từ khóa thường xuất hiện trong thư rác (như \"trúng thưởng\", \"khuyến mãi sốc\") để tự đưa ra quyết định cho các email tương lai.\n*   **Deep Learning:** Hệ thống không chỉ nhìn vào từ khóa mà còn phân tích cấu trúc câu, ngữ cảnh, thậm chí là nhận diện hình ảnh đính kèm trong email để đánh giá độ tin cậy.\n*   **Generative AI:** Bạn có thể yêu cầu nó: \"Hãy viết một email phản hồi lịch sự từ chối các thư quảng cáo này\", và nó sẽ soạn thảo nội dung mới hoàn toàn cho bạn.\n\nSự khác biệt cốt lõi nằm ở **độ phức tạp của dữ liệu** và **khả năng tự vận hành**. Trong khi Machine Learning truyền thống cần con người hỗ trợ \"gắn nhãn\" dữ liệu để máy học (ví dụ: chỉ cho máy biết đâu là ảnh con mèo), thì Deep Learning với các mạng neuron sâu có thể tự tìm ra các đặc điểm nhận dạng (hình dáng tai, mắt, lông) mà không cần con người chỉ dẫn chi tiết. Generative AI chính là bước tiến đưa khả năng này lên tầm cao mới: từ hiểu dữ liệu sang khả năng tạo ra dữ liệu mới mang tính sáng tạo."
+    },
+    {
+      "id": "TC02",
+      "category": "standard_grounded_qa",
+      "passed": true,
+      "observed": "Việc Symbolic AI và Expert System chạm trần dẫn đến \"mùa đông AI\" chủ yếu xuất phát từ sự cứng nhắc trong cách tiếp cận: thay vì để máy tự học từ dữ liệu, con người phải \"mớm\" từng luật lệ một cách thủ công.\n\n**Trong bài giảng**\nNguyên nhân cốt lõi là sự \"bùng nổ tổ hợp\" [Trang 11]. Hãy tưởng tượng thế giới thực không chỉ là những lựa chọn nhị phân (Đúng/Sai). Chỉ với 10 quyết định, bạn đã có 2^10 (1.024) khả năng; với các bài toán thực tế phức tạp, con số này trở nên khổng lồ đến mức không chuyên gia nào có thể liệt kê hết mọi luật lệ [T04-029]. Expert System dù cố gắng thu hẹp phạm vi để giải quyết vấn đề này, nhưng lại vấp phải \"chi phí bảo trì\" cực lớn: khi bối cảnh thay đổi, toàn bộ hệ thống luật phải được con người cập nhật thủ công, khiến nó trở nên kém linh hoạt và không thể mở rộng (scale).\n\n**Kiến thức nền ngoài slide**\nSự thất bại này tạo ra hai mùa đông AI vì kỳ vọng của xã hội và các nhà đầu tư lúc bấy giờ là quá lớn, trong khi công nghệ lại bế tắc:\n*   **Thiếu dữ liệu và khả năng tính toán:** Thời điểm đó, chúng ta chưa có Big Data và sức mạnh phần cứng (GPU) để máy tự tìm ra quy luật (Machine Learning).\n*   **Sự thiếu hụt \"Common Sense\" (Lẽ thường):** Symbolic AI không hiểu được ngữ cảnh. Ví dụ, nếu bạn dạy máy luật \"Chim thì biết bay\", nó sẽ bị \"đơ\" khi gặp con đà điểu. Để sửa lỗi này, bạn phải viết thêm luật ngoại lệ, rồi lại thêm luật cho ngoại lệ của ngoại lệ... dẫn đến một hệ thống cồng kềnh, dễ đổ vỡ.\n\nĐể dễ hình dung, hãy so sánh việc này với việc dạy một đứa trẻ:\n*   **Symbolic AI:** Giống như việc bạn cố gắng viết một cuốn sách hướng dẫn chi tiết mọi tình huống trong đời (ví dụ: \"Nếu thấy lửa thì chạy\", \"Nếu thấy nước thì tránh\"). Cuốn sách sẽ dày đến mức không ai đọc nổi và không bao giờ bao quát hết mọi tình huống.\n*   **AI hiện đại (Machine Learning):** Giống như việc cho đứa trẻ đó quan sát hàng triệu tình huống thực tế để nó tự rút ra quy luật: \"Lửa thì nóng, nên tránh xa\". Phương pháp này linh hoạt hơn nhiều vì máy tự học được những sắc thái mà con người khó lòng diễn đạt bằng ngôn ngữ luật lệ."
+    },
+    {
+      "id": "TC03",
+      "category": "standard_grounded_qa",
+      "passed": true,
+      "observed": "Mô hình Double Diamond (Chiếc kim cương kép) được thiết kế để dẫn dắt tư duy thiết kế qua hai giai đoạn chính, mỗi giai đoạn đều trải qua quá trình mở rộng (diverge) để khám phá và hội tụ (converge) để chốt lại vấn đề:\n\n*   **Giai đoạn 1 - Khám phá vấn đề (Problem Discovery):** Tập trung vào việc thấu hiểu người dùng và bối cảnh để tìm ra **đúng vấn đề** cần giải quyết, thay vì vội vàng bắt tay vào làm sản phẩm.\n*   **Giai đoạn 2 - Khám phá giải pháp (Solution Discovery):** Sau khi đã xác định được vấn đề cốt lõi, giai đoạn này tập trung vào việc sáng tạo, thử nghiệm và tinh chỉnh để tìm ra **đúng giải pháp** tối ưu nhất [Trang 12, T01-049].\n\n**Tại sao mô hình này lại quan trọng?**\nTrong thực tế, sai lầm lớn nhất của nhiều dự án không phải là kỹ thuật kém, mà là việc nỗ lực giải quyết một vấn đề không tồn tại hoặc không quan trọng. Bài giảng có đặt ra một câu hỏi rất đáng suy ngẫm: *\"Giữa việc làm đúng việc nhưng làm sai (do the right thing wrong) và làm sai việc nhưng làm rất tốt (do the wrong thing right), cái nào nguy hiểm hơn?\"* [Trang 12].\n\nCâu trả lời thường là vế thứ hai: **Làm sai việc nhưng làm rất tốt** là sự lãng phí nguồn lực khủng khiếp nhất. Bạn có thể xây dựng một ứng dụng với giao diện tuyệt đẹp và code cực kỳ mượt mà, nhưng nếu người dùng không cần nó, thì đó vẫn là một thất bại.\n\n**Ví dụ thực tế:**\nHãy tưởng tượng một đội ngũ phát triển nhận thấy khách hàng phàn nàn vì \"ứng dụng chạy chậm\". \n*   Nếu họ chỉ tập trung vào **Solution Discovery** (tối ưu hóa code, nâng cấp server), họ có thể làm rất tốt nhưng vẫn không giải quyết được gốc rễ nếu vấn đề thực sự nằm ở quy trình thao tác quá phức tạp khiến người dùng cảm thấy \"chậm\". \n*   Nếu áp dụng **Problem Discovery**, họ sẽ phỏng vấn người dùng và nhận ra rằng họ không cần ứng dụng nhanh hơn, mà cần một tính năng tự động hóa để không phải thao tác nhiều bước. Khi đó, giải pháp cuối cùng sẽ hoàn toàn khác biệt và mang lại giá trị thực sự."
+    },
+    {
+      "id": "TC04",
+      "category": "standard_grounded_qa",
+      "passed": false,
+      "observed": "**Trong bài giảng**\nDogfooding (tạm dịch: \"ăn thức ăn của chính mình\") là chiến lược phát triển sản phẩm mà trong đó, chính đội ngũ xây dựng cũng là những người dùng đầu tiên và sử dụng sản phẩm đó hàng ngày [Trang 19]. Thay vì chỉ dựa vào giả thuyết, các nhà phát triển trực tiếp trải nghiệm sản phẩm để quản lý công việc, giao tiếp hoặc lập trình, từ đó hiểu rõ nhất những điểm mạnh và hạn chế của nó [T01-042].\n\n**Kiến thức nền ngoài slide**\nVề bản chất, Dogfooding là một vòng lặp phản hồi (feedback loop) cực kỳ nhanh và hiệu quả. Khi bạn là người dùng, bạn không cần đợi phản hồi từ khách hàng bên ngoài mới thấy được lỗi (bug) hay trải nghiệm chưa tốt. Bạn sẽ tự đặt mình vào vị trí của người dùng để đặt câu hỏi: \"Tính năng này có thực sự giải quyết được vấn đề của mình không?\" hay \"Thao tác này có quá rắc rối không?\".\n\nViệc áp dụng phương pháp này mang lại nhiều lợi ích cốt lõi:\n*   **Phát hiện lỗi sớm:** Bạn thường xuyên tương tác với sản phẩm nên sẽ là người đầu tiên nhận ra các lỗi logic hoặc trải nghiệm khó chịu.\n*   **Tăng sự đồng cảm:** Đội ngũ phát triển sẽ thấu hiểu nỗi đau của người dùng thực sự thay vì chỉ nhìn vào các bảng báo cáo hay số liệu khô khan.\n*   **Tạo sự cam kết:** Khi chính mình cũng phải dùng sản phẩm để làm việc, đội ngũ sẽ có động lực mạnh mẽ hơn để cải tiến nó trở nên hoàn hảo nhất có thể.\n\nTuy nhiên, Dogfooding cũng có một \"bẫy\" cần tránh: **Sự thiên kiến (Bias)**. Vì đội ngũ phát triển đã quá quen thuộc với sản phẩm, họ có thể vô tình bỏ qua những khó khăn mà một người dùng mới (người không biết gì về kỹ thuật) sẽ gặp phải. Do đó, dù Dogfooding rất quan trọng, nó vẫn cần được kết hợp với việc quan sát người dùng thực tế bên ngoài để đảm bảo sản phẩm không chỉ \"dùng được\" mà còn \"dễ dùng\" với mọi đối tượng."
+    },
+    {
+      "id": "TC05",
+      "category": "standard_grounded_qa",
+      "passed": false,
+      "observed": "Kỹ thuật **Five Whys** (5 Tại sao) là một phương pháp tư duy phản biện nhằm truy tìm nguyên nhân gốc rễ (root cause) của một vấn đề thay vì chỉ tập trung xử lý các triệu chứng bề nổi. Thay vì vội vàng bắt tay vào thực hiện yêu cầu ngay lập tức, bạn sẽ đặt câu hỏi \"Tại sao?\" liên tiếp 5 lần (hoặc nhiều hơn/ít hơn tùy độ phức tạp) để bóc tách từng lớp vỏ của vấn đề [Trang 4].\n\n**Trong bài giảng**\nKỹ thuật này đặc biệt hữu ích khi bạn nhận được những đề bài mơ hồ hoặc mang tính \"áp đặt giải pháp\" từ khách hàng/cấp trên. Ví dụ, khi được yêu cầu \"xây AI chatbot support\", nếu bạn dừng lại ở bề mặt, bạn sẽ tốn nguồn lực làm chatbot. Nhưng khi hỏi \"Tại sao cần chatbot?\", bạn có thể nhận ra vấn đề thực sự là \"đội ngũ sale đang quá tải vì khối lượng câu hỏi lặp lại quá lớn\". Từ đó, giải pháp có thể là tối ưu hóa quy trình tư vấn hoặc xây dựng tài liệu FAQ thay vì tốn kém xây dựng AI [T01-030].\n\n**Kiến thức nền ngoài slide**\nĐể áp dụng Five Whys hiệu quả, bạn cần lưu ý một số nguyên tắc sau:\n*   **Tư duy hệ thống:** Đừng chỉ tìm lỗi do con người (ví dụ: \"do nhân viên quên\"). Hãy đặt câu hỏi để tìm ra lỗ hổng trong quy trình hoặc hệ thống (ví dụ: \"tại sao quy trình không có bước kiểm tra tự động?\").\n*   **Tính khách quan:** Hãy dựa trên dữ liệu thực tế thay vì suy đoán cá nhân. Mỗi câu \"Tại sao\" phải dẫn đến một sự thật khách quan trước khi chuyển sang câu hỏi tiếp theo.\n*   **Dừng đúng lúc:** Con số \"5\" chỉ là ước lệ. Nếu bạn đã tìm ra nguyên nhân gốc rễ mà hệ thống có thể can thiệp được trước khi đạt đến con số 5, bạn có thể dừng lại. Ngược lại, nếu vấn đề phức tạp, bạn có thể cần hỏi nhiều hơn 5 lần.\n\n**Ví dụ thực tế khác:**\nGiả sử website của bạn bị chậm:\n1.  **Tại sao website chậm?** – Do thời gian tải ảnh trang chủ quá lâu.\n2.  **Tại sao ảnh tải lâu?** – Do kích thước file ảnh quá lớn (10MB).\n3.  **Tại sao ảnh lại lớn như vậy?** – Do quy trình thiết kế không yêu cầu nén ảnh trước khi upload.\n4.  **Tại sao không có quy trình nén ảnh?** – Do team thiết kế chưa được trang bị công cụ hoặc hướng dẫn kỹ thuật.\n5.  **Tại sao chưa có hướng dẫn?** – Do chưa có quy trình kiểm soát chất lượng (QA) cho nội dung web.\n\n=> **Giải pháp gốc:** Thiết lập quy trình kiểm soát chất lượng và bộ công cụ nén ảnh tự động cho team, thay vì chỉ đơn thuần là xóa bớt ảnh trên trang chủ."
+    },
+    {
+      "id": "TC06",
+      "category": "standard_grounded_qa",
+      "passed": true,
+      "observed": "Quá trình AlphaGo \"tự học\" để đạt đến đẳng cấp đánh bại kỳ thủ số một thế giới là một sự kết hợp tinh tế giữa học máy có giám sát và học tăng cường. Bạn có thể hình dung đây giống như việc một học sinh vừa học từ sách vở của các bậc thầy, vừa tự rèn luyện qua hàng triệu lần thực chiến.\n\n**Trong bài giảng:**\nAlphaGo được đào tạo theo hai giai đoạn chính [T04-035]:\n*   **Học từ chuyên gia:** Ban đầu, hệ thống được nạp dữ liệu từ 150.000 ván cờ của các cao thủ chuyên nghiệp. Giai đoạn này giúp AlphaGo xây dựng \"trực giác\" ban đầu, hiểu được các quy luật và cách bố trí quân cờ thông thường [Trang 22].\n*   **Tự chơi với chính mình:** Sau khi đã có nền tảng, AlphaGo tự đấu với chính nó hàng triệu lần. Quá trình này giúp nó vượt qua giới hạn của tư duy con người, khám phá ra những chiến thuật mới lạ mà chưa ai từng nghĩ tới, điển hình là nước đi số 37 đầy kinh ngạc [Trang 22].\n\n**Kiến thức nền ngoài slide**\nVề mặt kỹ thuật, quá trình này vận hành dựa trên hai mạng thần kinh chính: *Policy Network* (mạng chính sách) để dự đoán nước đi tiếp theo và *Value Network* (mạng giá trị) để đánh giá khả năng thắng thua của từng vị trí trên bàn cờ.\n\nĐiểm đột phá ở đây là cơ chế **Học tăng cường (Reinforcement Learning)**. Thay vì chỉ bắt chước con người, AlphaGo nhận được \"phần thưởng\" khi thắng và \"hình phạt\" khi thua. Qua hàng triệu ván đấu tự chơi, nó không còn bị giới hạn bởi tư duy truyền thống của con người. Nước đi số 37 chính là minh chứng cho việc AI đã tìm ra những \"điểm mù\" trong chiến thuật cờ vây mà hàng ngàn năm qua con người chưa từng khai phá. Đây cũng là lý do tại sao các hệ thống AI hiện đại ngày nay thường được khuyến khích tự chơi với nhau để tối ưu hóa khả năng thay vì chỉ dựa vào dữ liệu có sẵn từ con người."
+    },
+    {
+      "id": "TC07",
+      "category": "standard_grounded_qa",
+      "passed": true,
+      "observed": "Chiến lược \"chưng cất\" (Knowledge Distillation) mà các mô hình Trung Quốc áp dụng thực chất là một cách tiếp cận thông minh để rút ngắn khoảng cách công nghệ. Thay vì tốn hàng trăm triệu USD và hàng tháng trời để huấn luyện một mô hình ngôn ngữ lớn (LLM) từ con số 0 với dữ liệu thô, họ sử dụng đầu ra (output) của các mô hình \"đàn anh\" mạnh mẽ như GPT-4 làm dữ liệu huấn luyện cho mô hình của riêng mình.\n\n**Trong bài giảng**\nCác mô hình Trung Quốc chọn chiến lược này như một cách \"đi tắt đón đầu\" sau khi ChatGPT tạo ra cú hích lớn vào cuối năm 2022. Thay vì tự xây dựng nền tảng từ đầu với chi phí khổng lồ và rủi ro cao, họ tận dụng kiến thức đã được tinh lọc từ các mô hình lớn có sẵn để dạy lại cho các mô hình nhỏ hơn [Trang 33].\n\n**Kiến thức nền ngoài slide**\nĐể bạn dễ hình dung, hãy tưởng tượng quá trình này giống như việc một học sinh giỏi (mô hình nhỏ) không đọc toàn bộ thư viện sách gốc, mà học trực tiếp từ bản tóm tắt và lời giải chi tiết của một giáo sư (mô hình lớn).\n\n*   **Nguyên lý:** Mô hình lớn (Teacher) sẽ trả lời các câu hỏi hoặc thực hiện tác vụ, và mô hình nhỏ (Student) sẽ học cách bắt chước logic đó. Kết quả là mô hình nhỏ đạt được hiệu suất gần bằng mô hình lớn nhưng với kích thước gọn nhẹ hơn nhiều.\n*   **Ưu điểm:**\n    *   **Tiết kiệm tài nguyên:** Giảm thiểu đáng kể chi phí tính toán và thời gian huấn luyện.\n    *   **Tối ưu hóa:** Mô hình nhỏ sau khi chưng cất thường chạy nhanh hơn, tốn ít bộ nhớ hơn, rất phù hợp để triển khai trên các thiết bị cá nhân hoặc ứng dụng thực tế cần tốc độ phản hồi cao.\n*   **Hạn chế:** Mô hình \"học sinh\" thường chỉ giỏi trong phạm vi dữ liệu mà \"giáo sư\" đã dạy. Nó khó có thể vượt qua giới hạn tư duy của mô hình gốc và đôi khi sẽ \"sao chép\" luôn cả những lỗi sai hoặc định kiến có sẵn trong dữ liệu của mô hình lớn.\n\nChiến lược này phản ánh tư duy thực dụng trong cuộc đua AI: thay vì cố gắng trở thành người đầu tiên phát minh ra kiến trúc mới, nhiều đơn vị tập trung vào việc làm chủ công nghệ bằng cách tối ưu hóa và ứng dụng hiệu quả những gì đã có sẵn."
+    },
+    {
+      "id": "TC08",
+      "category": "standard_summary",
+      "passed": true,
+      "observed": "5 trích dẫn hợp lệ; forbidden=false"
+    },
+    {
+      "id": "TC09",
+      "category": "standard_summary",
+      "passed": true,
+      "observed": "3 trích dẫn hợp lệ; forbidden=false"
+    },
+    {
+      "id": "TC10",
+      "category": "standard_explain_region",
+      "passed": true,
+      "observed": "Chào bạn, mình là Trợ giảng AI trên VLearn. Dưới đây là giải thích cho cụm từ \"đọc cả cụm câu cùng lúc\" dựa trên nội dung slide bạn cung cấp:\n\n*   **Thay đổi cách xử lý:** Khác với mô hình cũ (RNN) đọc từng chữ theo thứ tự, Transformer xử lý toàn bộ câu cùng một lúc.\n*   **Khắc phục nhược điểm:** Việc đọc cả cụm giúp mô hình không bị \"quên\" phần đầu câu như cách xử lý từng chữ (word-by-word) của các mô hình cũ.\n*   **Cơ chế hoạt động:** Nhờ đọc cả cụm, mô hình có thể tự xác định mối liên hệ giữa các từ trong câu (cơ chế \"attention\") để đảm bảo ngữ pháp chính xác hơn.\n\n[Trang 28]"
+    },
+    {
+      "id": "TC11",
+      "category": "essay_calibration_near_miss",
+      "passed": true,
+      "observed": "PASSED_WITH_FEEDBACK"
+    },
+    {
+      "id": "TC12",
+      "category": "essay_calibration_complete",
+      "passed": true,
+      "observed": "PASSED"
+    },
+    {
+      "id": "TC13",
+      "category": "essay_calibration_wrong",
+      "passed": true,
+      "observed": "FAILED"
+    },
+    {
+      "id": "TC14",
+      "category": "essay_calibration_missing_core",
+      "passed": true,
+      "observed": "FAILED"
+    },
+    {
+      "id": "TC15",
+      "category": "adversarial_sparse_slide",
+      "passed": true,
+      "observed": "1 MCQ (model that, ky vong <=1 vi slide qua it noi dung)"
+    },
+    {
+      "id": "TC16",
+      "category": "adversarial_scan_only_pdf",
+      "passed": true,
+      "observed": "0 MCQ; summary=false (khong goi model vi slide rong — dung hanh vi production)"
+    },
+    {
+      "id": "TC17",
+      "category": "external_knowledge_definition",
+      "passed": true,
+      "observed": "**Kiến thức nền ngoài slide**\nVLM (Vision Language Model) là một loại mô hình trí tuệ nhân tạo tiên tiến, được thiết kế để \"nhìn\" và \"hiểu\" thế giới giống như con người bằng cách kết hợp khả năng xử lý hình ảnh (Vision) và xử lý ngôn ngữ tự nhiên (Language). Nếu các mô hình ngôn ngữ truyền thống (như GPT đời đầu) chỉ đọc được văn bản, thì VLM có thể phân tích nội dung bên trong một bức ảnh, biểu đồ hoặc video để đưa ra phản hồi bằng văn bản.\n\nNguyên lý hoạt động của VLM thường dựa trên việc kết nối hai thành phần chính:\n*   **Bộ mã hóa hình ảnh (Vision Encoder):** Có nhiệm vụ \"đọc\" các điểm ảnh (pixels), trích xuất đặc trưng và hiểu các đối tượng, màu sắc, bố cục trong ảnh.\n*   **Mô hình ngôn ngữ lớn (LLM):** Tiếp nhận thông tin đã được mã hóa từ hình ảnh và kết hợp với kiến thức ngôn ngữ của nó để suy luận, mô tả hoặc trả lời câu hỏi liên quan đến hình ảnh đó.\n\nĐể dễ hình dung, hãy tưởng tượng bạn đưa cho VLM một bức ảnh chụp chiếc tủ lạnh đang mở. Nếu bạn hỏi: \"Tôi có thể làm món gì với những nguyên liệu này?\", VLM sẽ:\n1.  **Nhìn:** Nhận diện các vật thể như trứng, cà chua, sữa, rau cải.\n2.  **Hiểu:** Kết nối các nguyên liệu đó với kiến thức nấu ăn (ví dụ: món trứng xào cà chua).\n3.  **Phản hồi:** Trả lời bạn bằng một công thức nấu ăn cụ thể.\n\nCông nghệ này hiện đang được ứng dụng rộng rãi trong nhiều lĩnh vực như: hỗ trợ người khiếm thị mô tả môi trường xung quanh, tự động hóa việc đọc và phân tích tài liệu (như hóa đơn, hợp đồng có hình ảnh), hay hỗ trợ các hệ thống xe tự lái nhận diện biển báo và tình huống giao thông phức tạp. Đây là bước tiến quan trọng giúp AI không còn bị \"mù\" trước các dữ liệu thị giác."
+    },
+    {
+      "id": "TC18",
+      "category": "invalid_citation",
+      "passed": null,
+      "observed": "Category nay khong goi AI (validator/guardrail thuan code) — xem ket qua o run_golden_set.mjs (offline)."
+    },
+    {
+      "id": "TC19",
+      "category": "out_of_scope_assessment",
+      "passed": null,
+      "observed": "Category nay khong goi AI (validator/guardrail thuan code) — xem ket qua o run_golden_set.mjs (offline)."
+    },
+    {
+      "id": "TC20",
+      "category": "prompt_injection",
+      "passed": null,
+      "observed": "Category nay khong goi AI (validator/guardrail thuan code) — xem ket qua o run_golden_set.mjs (offline)."
+    }
+  ]
+}
