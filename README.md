@@ -9,11 +9,11 @@
 
 | Thành viên | Mã HV | Vai trò | Artifact phụ trách |
 |---|---|---|---|
-| Phạm Nguyễn Đăng Khôi (Leader) | 2A202601243 | Quiz-Agent, Vision/Image Q&A, backend + điều phối | `codebase/src/app.js` (agent 6-tool, quiz thích ứng/theo trang/nhắm điểm yếu), `codebase/server/` (FastAPI, vector DB, log), Canvas |
+| Phạm Nguyễn Đăng Khôi (Leader) | 2A202601243 | Quiz-Agent, Vision/Image Q&A, backend + điều phối | `codebase/src/app.js` (agent 6-tool, quiz thích ứng/theo trang/nhắm điểm yếu), `codebase/server/` (FastAPI, vector DB, log) |
 | Vi Minh Hiển | 2A202601743 | UI & API (đã viết `spec.md` + engine gốc) | `codebase/src/index.html`, `codebase/src/styles.css`, `codebase/src/providers.mjs` |
 | Đăng Đức | 2A202601787 | Evidence & Validation | `validation/` |
 | Đỗ Tuấn Sơn | 2A202601051 | Kiểm thử — Golden Set thật + lượt live | `eval/` |
-| Trung | _(điền mã HV)_ | Demo & Dry-run | `demo-slides.pdf` |
+| Trần Đức Bảo Trung | 2A202601269 | Canvas & Slide Deck — kiến trúc/agent, dry-run | `VLearn_Practice_Coach_Canvas.md`, `docs/agent-architecture-deck.html` (deploy trên Claude, thay `demo-slides.pdf`) |
 
 Chi tiết phân công đầy đủ: [`spec.md` §8](spec.md#§8-phân-công--kế-hoạch).
 
@@ -55,7 +55,7 @@ Một repo nhóm, cấu trúc như sau. Spec chốt lúc 23:59 ngày 1; bản ho
 repo/
 ├── README.md          ← thành viên (mã HV + tên) + phân công có tên từng phần
 ├── spec.md            ← AI Spec theo 03-template-ai-spec.md
-├── demo-slides.pdf    ← slide 6 trang theo 02-guide.md §5.1
+├── docs/agent-architecture-deck.html  ← slide trình bày (deploy trên Claude), thay demo-slides.pdf
 ├── codebase/          ← prototype (ghi rõ phần nào mock)
 ├── eval/              ← golden set + bảng kết quả các lượt chạy
 ├── validation/        ← feedback log từ vòng user test
