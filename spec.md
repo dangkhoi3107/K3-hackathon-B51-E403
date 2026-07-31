@@ -1,4 +1,4 @@
-# AI SPEC — VLearn Grounding Tutor & End-of-Session Quiz Agent · Nhóm G17 · Zone E403
+# AI SPEC — VLearn Grounding Tutor & End-of-Session Quiz Agent · Nhóm B51 · Zone 6
 
 Hướng: [x] A — VLearn  [ ] B — Trợ lý Học viên  [ ] C — Làn mở  
 Loại: [x] Tính năng AI mới  [x] Tối ưu tính năng có sẵn
